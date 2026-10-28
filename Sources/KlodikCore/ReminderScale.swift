@@ -6,17 +6,19 @@ public enum ReminderScale: String, Codable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .gentle: "Спокойно"
-        case .normal: "Обычно"
-        case .insistent: "Настойчиво"
+        case .gentle: tr("Спокойно", "Gentle")
+        case .normal: tr("Обычно", "Normal")
+        case .insistent: tr("Настойчиво", "Insistent")
         }
     }
 
     public var detail: String {
         switch self {
-        case .gentle: "Прыжок раз в 2 минуты, через 10 минут — раз в минуту. Без остановки не прыгает."
-        case .normal: "Раз в минуту, через 2 минуты — раз в 30 секунд. Без остановки не прыгает."
-        case .insistent: "Раз в 30 секунд, через 2 минуты — без остановки."
+        case .gentle: tr("Прыжок раз в 2 минуты, через 10 минут — раз в минуту. Без остановки не прыгает.",
+                          "Jumps every 2 minutes, after 10 minutes every minute. Never nonstop.")
+        case .normal: tr("Раз в минуту, через 2 минуты — раз в 30 секунд. Без остановки не прыгает.",
+                          "Every minute, after 2 minutes every 30 seconds. Never nonstop.")
+        case .insistent: tr("Раз в 30 секунд, через 2 минуты — без остановки.", "Every 30 seconds, after 2 minutes nonstop.")
         }
     }
 

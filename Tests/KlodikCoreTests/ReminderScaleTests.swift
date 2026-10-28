@@ -2,6 +2,8 @@ import XCTest
 @testable import KlodikCore
 
 final class ReminderScaleTests: XCTestCase {
+    override func setUp() { Lang.current = .ru }
+
     let now = Date(timeIntervalSince1970: 1_793_200_000)
 
     func nudge(_ scale: ReminderScale, waiting minutes: Double) -> Attention.Nudge {

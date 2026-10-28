@@ -13,6 +13,8 @@ final class SessionListModel: ObservableObject {
     @Published var serverProblem: String?
     /// Как быстро сегодня отвечал на запросы. nil — сегодня ответов ещё не было.
     @Published var daySummary: DaySummary?
+    /// На GitHub вышла версия новее установленной.
+    @Published var update: UpdateCheck.Release?
 
     var open: (TrackedItem) -> Void = { _ in }
     var toggleRemind: (TrackedItem) -> Void = { _ in }
@@ -21,6 +23,7 @@ final class SessionListModel: ObservableObject {
     var toggleSnooze: () -> Void = {}
     var openSettings: () -> Void = {}
     var quit: () -> Void = {}
+    var openUpdate: (URL) -> Void = { _ in }
 }
 
 struct SessionListView: View {
@@ -29,7 +32,7 @@ struct SessionListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if model.items.isEmpty {
-                Text("Никто не ждёт")
+                Text(tr("Никто не ждёт", "Nobody is waiting"))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
@@ -40,10 +43,10 @@ struct SessionListView: View {
                             SessionRow(item: item, reminded: model.remindIds.contains(item.localId), now: model.now)
                                 .onTapGesture { model.open(item) }
                                 .contextMenu {
-                                    Button(model.remindIds.contains(item.localId) ? "Не напоминать" : "Напомнить") {
+                                    Button(model.remindIds.contains(item.localId) ? tr("Не напоминать", "Don't remind me") : tr("Напомнить", "Remind me")) {
                                         model.toggleRemind(item)
                                     }
-                                    Button("Скрыть до следующей активности") { model.hide(item) }
+                                    Button(tr("Скрыть до следующей активности", "Hide until next activity")) { model.hide(item) }
                                 }
                         }
                     }
@@ -53,7 +56,7 @@ struct SessionListView: View {
             }
 
             if model.formatBroken {
-                Warning(text: "Не читаются файлы сессий Claude — слежу только по хукам")
+                Warning(text: tr("Не читаются файлы сессий Claude — слежу только по хукам", "Can't read Claude session files: tracking via hooks only"))
             }
             if let problem = model.serverProblem {
                 Warning(text: problem)
@@ -61,21 +64,33 @@ struct SessionListView: View {
             if !model.hooksInstalled {
                 Divider()
                 HStack {
-                    Text("Claude Code не подключён: не вижу запросов разрешений")
+                    Text(tr("Claude Code не подключён: не вижу запросов разрешений", "Claude Code isn't connected: can't see permission requests"))
                         .font(.caption)
                         .foregroundStyle(.orange)
                     Spacer()
-                    Button("Подключить") { model.installHooks() }
+                    Button(tr("Подключить", "Connect")) { model.installHooks() }
                         .font(.caption)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
             }
 
+            if let update = model.update {
+                Divider()
+                HStack {
+                    Text(tr("Вышла версия \(update.version)", "Version \(update.version) is out")).font(.caption)
+                    Spacer()
+                    Button(tr("Скачать", "Download")) { model.openUpdate(update.url) }.font(.caption)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+            }
             if let summary = model.daySummary {
                 Divider()
-                Text("Сегодня ответов: \(summary.answered), в среднем через \(WaitTime.duration(summary.average)). "
-                     + "Дольше всех ждала «\(summary.longest.title)»: \(WaitTime.duration(summary.longest.duration))")
+                Text(tr("Сегодня ответов: \(summary.answered), в среднем через \(WaitTime.duration(summary.average)). "
+                        + "Дольше всех ждала «\(summary.longest.title)»: \(WaitTime.duration(summary.longest.duration))",
+                        "Today: \(summary.answered) answered, \(WaitTime.duration(summary.average)) on average. "
+                        + "Longest wait: “\(summary.longest.title)”, \(WaitTime.duration(summary.longest.duration))"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -85,10 +100,10 @@ struct SessionListView: View {
 
             Divider()
             HStack {
-                Button(model.snoozed ? "Не откладывать" : "Отложить на 30 минут") { model.toggleSnooze() }
+                Button(model.snoozed ? tr("Не откладывать", "Resume reminders") : tr("Отложить на 30 минут", "Snooze for 30 minutes")) { model.toggleSnooze() }
                 Spacer()
-                Button("Настройки") { model.openSettings() }
-                Button("Выйти") { model.quit() }
+                Button(tr("Настройки", "Settings")) { model.openSettings() }
+                Button(tr("Выйти", "Quit")) { model.quit() }
             }
             .buttonStyle(.borderless)
             .font(.callout)

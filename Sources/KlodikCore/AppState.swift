@@ -16,6 +16,12 @@ public struct AppState: Codable, Equatable {
     public var reminderScale = ReminderScale.normal
     /// ⌥⌘K открывает сессию, которая дольше всех ждёт.
     public var hotKeyEnabled = true
+    /// Раз в сутки спрашивать GitHub, нет ли новой версии.
+    public var checkUpdates = true
+    public var lastUpdateCheck: Date?
+    /// Последний релиз на GitHub по прошлой проверке: плашка «вышла версия» переживает перезапуск.
+    public var latestVersion: String?
+    public var latestURL: URL?
 
     public init() {}
 
@@ -30,6 +36,10 @@ public struct AppState: Codable, Equatable {
         // Незнакомое значение шкалы (файл от будущей версии) — обычная шкала, а не сброс всего файла.
         reminderScale = (try? c.decodeIfPresent(ReminderScale.self, forKey: .reminderScale)) ?? .normal
         hotKeyEnabled = try c.decodeIfPresent(Bool.self, forKey: .hotKeyEnabled) ?? true
+        checkUpdates = try c.decodeIfPresent(Bool.self, forKey: .checkUpdates) ?? true
+        lastUpdateCheck = try c.decodeIfPresent(Date.self, forKey: .lastUpdateCheck)
+        latestVersion = try c.decodeIfPresent(String.self, forKey: .latestVersion)
+        latestURL = try c.decodeIfPresent(URL.self, forKey: .latestURL)
     }
 
     /// KLODIK_STATE_DIR — другая папка для state.json (демо-запуск рядом с настоящим Клодиком).

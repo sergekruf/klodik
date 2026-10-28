@@ -2,6 +2,8 @@ import XCTest
 @testable import KlodikCore
 
 final class WaitTimeTests: XCTestCase {
+    override func setUp() { Lang.current = .ru }
+
     func testShortForms() {
         XCTAssertEqual(WaitTime.short(20), "только что")
         XCTAssertEqual(WaitTime.short(60), "1 мин")
@@ -23,5 +25,14 @@ final class WaitTimeTests: XCTestCase {
         XCTAssertEqual(WaitTime.duration(3600), "1 ч")
         XCTAssertEqual(WaitTime.duration(80 * 60), "1 ч 20 мин")
         XCTAssertEqual(WaitTime.duration(50 * 3600), "2 дн")
+    }
+
+    func testEnglish() {
+        Lang.current = .en
+        defer { Lang.current = .ru }
+        XCTAssertEqual(WaitTime.short(30), "just now")
+        XCTAssertEqual(WaitTime.short(12 * 60), "12 min")
+        XCTAssertEqual(WaitTime.duration(80 * 60), "1 h 20 min")
+        XCTAssertEqual(ReminderScale.normal.title, "Normal")
     }
 }

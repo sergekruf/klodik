@@ -86,7 +86,11 @@ final class PetController: NSObject, NSMenuDelegate {
             scheduleRefresh()
         }
 
-        let tick = Timer(timeInterval: Self.tickEvery, repeats: true) { [weak self] _ in self?.refresh() }
+        checkForUpdateIfDue()
+        let tick = Timer(timeInterval: Self.tickEvery, repeats: true) { [weak self] _ in
+            self?.refresh()
+            self?.checkForUpdateIfDue()
+        }
         tick.tolerance = 5
         RunLoop.main.add(tick, forMode: .common)
         tickTimer = tick
@@ -153,10 +157,10 @@ final class PetController: NSObject, NSMenuDelegate {
               !front.isClaudeFrontmost, snoozedUntil == nil else { return }
 
         if let item = items.first(where: { $0.dot == .gray && previous[$0.localId] != .gray }) {
-            bubble.show("Ждёт ответа: \(item.title)", above: panel.frame)
+            bubble.show(tr("Ждёт ответа: \(item.title)", "Waiting for you: \(item.title)"), above: panel.frame)
             animator.playOnce(.wave)
         } else if let item = items.first(where: { $0.dot == .blue && previous[$0.localId] == nil }) {
-            bubble.show("Готово: \(item.title)", above: panel.frame)
+            bubble.show(tr("Готово: \(item.title)", "Done: \(item.title)"), above: panel.frame)
             animator.playOnce(.happy)
         }
     }
@@ -222,7 +226,8 @@ final class PetController: NSObject, NSMenuDelegate {
                 portAttempts += 1
                 startServer(port: port + 1)
             } else {
-                listModel.serverProblem = "Порты \(state.port)–\(port) заняты: Клодик не слышит хуки"
+                listModel.serverProblem = tr("Порты \(state.port)–\(port) заняты: Клодик не слышит хуки",
+                                              "Ports \(state.port)–\(port) are busy: Klodik can't hear hooks")
             }
         }
         refreshHooksState()
@@ -242,7 +247,7 @@ final class PetController: NSObject, NSMenuDelegate {
             try HookInstaller.install(port: state.port)
         } catch {
             NSLog("Klodik: не удалось поставить хуки: \(error)")
-            bubble.show("Не получилось: ~/.claude/settings.json не читается", above: panel.frame, for: 5)
+            bubble.show(tr("Не получилось: ~/.claude/settings.json не читается", "Failed: can't read ~/.claude/settings.json"), above: panel.frame, for: 5)
         }
         refreshHooksState()
     }
@@ -252,7 +257,7 @@ final class PetController: NSObject, NSMenuDelegate {
             try HookInstaller.uninstall()
         } catch {
             NSLog("Klodik: не удалось убрать хуки: \(error)")
-            bubble.show("Не получилось: ~/.claude/settings.json не читается", above: panel.frame, for: 5)
+            bubble.show(tr("Не получилось: ~/.claude/settings.json не читается", "Failed: can't read ~/.claude/settings.json"), above: panel.frame, for: 5)
         }
         refreshHooksState()
     }
@@ -271,7 +276,7 @@ final class PetController: NSObject, NSMenuDelegate {
                 try LoginItem.set(enabled)
                 self?.settingsModel.loginError = nil
             } catch {
-                self?.settingsModel.loginError = "Не получилось: \(error.localizedDescription)"
+                self?.settingsModel.loginError = tr("Не получилось: \(error.localizedDescription)", "Failed: \(error.localizedDescription)")
             }
             self?.refreshSettingsModel()
         }
@@ -284,12 +289,18 @@ final class PetController: NSObject, NSMenuDelegate {
             self?.applyHotKey()
             self?.settingsChanged()
         }
+        settingsModel.setCheckUpdates = { [weak self] enabled in
+            self?.state.checkUpdates = enabled
+            if !enabled { self?.listModel.update = nil }
+            self?.settingsChanged()
+            self?.checkForUpdateIfDue()
+        }
         settingsModel.toggleHooks = { [weak self] in self?.toggleHooks() }
 
         let host = NSHostingController(rootView: SettingsView(model: settingsModel))
         host.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: host)
-        window.title = "Клодик — настройки"
+        window.title = tr("Клодик — настройки", "Klodik Settings")
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.center()
@@ -308,6 +319,7 @@ final class PetController: NSObject, NSMenuDelegate {
         settingsModel.loginNeedsApproval = status == .requiresApproval
         settingsModel.reminderScale = state.reminderScale
         settingsModel.hotKeyEnabled = state.hotKeyEnabled
+        settingsModel.checkUpdates = state.checkUpdates
         settingsModel.hotKeyBusy = state.hotKeyEnabled && hotKey == nil
         refreshHooksState()
     }
@@ -317,6 +329,32 @@ final class PetController: NSObject, NSMenuDelegate {
         applySettings()
         refreshSettingsModel()
         refresh()
+    }
+
+    // MARK: - Новая версия
+
+    /// Раз в сутки спросить GitHub о последнем релизе. Запуск не из .app (нет версии в Info.plist) — не проверяем.
+    private func checkForUpdateIfDue() {
+        guard state.checkUpdates,
+              let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else { return }
+        if let version = state.latestVersion, let url = state.latestURL, UpdateCheck.isNewer(version, than: current) {
+            listModel.update = UpdateCheck.Release(version: version, url: url)
+        }
+        if let last = state.lastUpdateCheck, Date().timeIntervalSince(last) < UpdateCheck.every { return }
+        state.lastUpdateCheck = Date()
+        save()
+        var request = URLRequest(url: UpdateCheck.latestReleaseAPI, timeoutInterval: 15)
+        request.setValue("Klodik/\(current)", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let data, let release = UpdateCheck.parse(data) else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                state.latestVersion = release.version
+                state.latestURL = release.url
+                save()
+                listModel.update = UpdateCheck.isNewer(release.version, than: current) ? release : nil
+            }
+        }.resume()
     }
 
     // MARK: - Горячая клавиша
@@ -334,8 +372,9 @@ final class PetController: NSObject, NSMenuDelegate {
 
     /// ⌥⌘K: самая давно ждущая сессия, при повторе — следующая.
     private func openNextSession() {
+        if Self.debug { NSLog("Klodik: нажато \(HotKey.display)") }
         guard let item = nextSession.pick(from: tracker.items(now: Date()), now: Date()) else {
-            bubble.show("Никто не ждёт", above: panel.frame)
+            bubble.show(tr("Никто не ждёт", "Nobody is waiting"), above: panel.frame)
             return
         }
         Self.openInClaude(item)
@@ -388,6 +427,10 @@ final class PetController: NSObject, NSMenuDelegate {
             self?.openSettings()
         }
         listModel.quit = { NSApp.terminate(nil) }
+        listModel.openUpdate = { [weak self] url in
+            self?.popover.performClose(nil)
+            NSWorkspace.shared.open(url)
+        }
     }
 
     static func openInClaude(_ item: TrackedItem) {
@@ -415,15 +458,15 @@ final class PetController: NSObject, NSMenuDelegate {
         hooks.target = self
         hooks.tag = 2
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Настройки…", action: #selector(openSettings), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Выйти", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: tr("Настройки…", "Settings…"), action: #selector(openSettings), keyEquivalent: "").target = self
+        menu.addItem(withTitle: tr("Выйти", "Quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         return menu
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.item(withTag: 1)?.title = snoozedUntil == nil ? "Отложить на 30 минут" : "Не откладывать"
+        menu.item(withTag: 1)?.title = snoozedUntil == nil ? tr("Отложить на 30 минут", "Snooze for 30 minutes") : tr("Не откладывать", "Resume reminders")
         refreshHooksState()
-        menu.item(withTag: 2)?.title = listModel.hooksInstalled ? "Отключить от Claude Code" : "Подключить к Claude Code"
+        menu.item(withTag: 2)?.title = listModel.hooksInstalled ? tr("Отключить от Claude Code", "Disconnect from Claude Code") : tr("Подключить к Claude Code", "Connect to Claude Code")
     }
 
     /// KLODIK_DEMO=<анимация> крутит её без остановки — для замеров нагрузки.
