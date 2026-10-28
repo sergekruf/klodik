@@ -23,7 +23,9 @@ final class PetController: NSObject, NSMenuDelegate {
     private var portAttempts = 0
     static let maxPortAttempts = 10
     private let tracker = Tracker()
-    private let policy = AttentionPolicy()
+    private var policy = AttentionPolicy()
+    private let settingsModel = SettingsModel()
+    private lazy var settingsWindow = makeSettingsWindow()
     private let front = FrontAppWatcher()
     private let bubble = Bubble()
     private let listModel = SessionListModel()
@@ -54,6 +56,7 @@ final class PetController: NSObject, NSMenuDelegate {
                                                object: nil, queue: .main) { [weak self] _ in self?.placePanel() }
 
         tracker.restore(remind: state.remind, hidden: state.hidden)
+        applySettings()
         tracker.onMarksChanged = { [weak self] in self?.saveMarks() }
 
         store.onChange = { [weak self] in
@@ -79,6 +82,9 @@ final class PetController: NSObject, NSMenuDelegate {
         startDemoIfAsked()
         refresh()
 
+        if ProcessInfo.processInfo.environment["KLODIK_SHOW_SETTINGS"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.openSettings() }
+        }
         // KLODIK_SHOW_LIST=1 — сразу открыть список (для проверки вёрстки без клика). Без клика система
         // не даёт Клодику стать активным, и обычный список закрылся бы сам, поэтому здесь он не закрывается.
         if ProcessInfo.processInfo.environment["KLODIK_SHOW_LIST"] != nil {
@@ -188,6 +194,7 @@ final class PetController: NSObject, NSMenuDelegate {
         switch serverState {
         case .ready:
             listModel.serverProblem = nil
+            settingsModel.listeningPort = port
             if port != state.port {
                 let hooksWereInstalled = HookInstaller.isInstalled(port: state.port)
                 NSLog("Klodik: порт \(state.port) занят, слушаю \(port)")
@@ -209,6 +216,7 @@ final class PetController: NSObject, NSMenuDelegate {
 
     private func refreshHooksState() {
         listModel.hooksInstalled = HookInstaller.isInstalled(port: state.port)
+        settingsModel.hooksInstalled = listModel.hooksInstalled
     }
 
     @objc private func toggleHooks() {
@@ -233,6 +241,80 @@ final class PetController: NSObject, NSMenuDelegate {
             bubble.show("Не получилось: ~/.claude/settings.json не читается", above: panel.frame, for: 5)
         }
         refreshHooksState()
+    }
+
+    // MARK: - Настройки
+
+    /// Окно в днях и шкала напоминаний из state.json — в трекер и политику.
+    private func applySettings() {
+        tracker.config.windowDays = state.windowDays
+        state.reminderScale.apply(to: &policy.config)
+    }
+
+    private func makeSettingsWindow() -> NSWindow {
+        settingsModel.setLaunchAtLogin = { [weak self] enabled in
+            do {
+                try LoginItem.set(enabled)
+                self?.settingsModel.loginError = nil
+            } catch {
+                self?.settingsModel.loginError = "Не получилось: \(error.localizedDescription)"
+            }
+            self?.refreshSettingsModel()
+        }
+        settingsModel.setReminderScale = { [weak self] scale in
+            self?.state.reminderScale = scale
+            self?.settingsChanged()
+        }
+        settingsModel.setWindowDays = { [weak self] days in
+            self?.state.windowDays = Double(days)
+            self?.settingsChanged()
+        }
+        settingsModel.applyPort = { [weak self] port in self?.changePort(port) }
+        settingsModel.toggleHooks = { [weak self] in self?.toggleHooks() }
+
+        let host = NSHostingController(rootView: SettingsView(model: settingsModel))
+        host.sizingOptions = [.preferredContentSize]
+        let window = NSWindow(contentViewController: host)
+        window.title = "Клодик — настройки"
+        window.styleMask = [.titled, .closable]
+        window.isReleasedWhenClosed = false
+        window.center()
+        return window
+    }
+
+    @objc private func openSettings() {
+        refreshSettingsModel()
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow.makeKeyAndOrderFront(nil)
+    }
+
+    private func refreshSettingsModel() {
+        let status = LoginItem.status
+        settingsModel.launchAtLogin = status == .enabled
+        settingsModel.loginNeedsApproval = status == .requiresApproval
+        settingsModel.reminderScale = state.reminderScale
+        settingsModel.windowDays = Int(state.windowDays)
+        settingsModel.portText = String(state.port)
+        refreshHooksState()
+    }
+
+    private func settingsChanged() {
+        save()
+        applySettings()
+        refreshSettingsModel()
+        refresh()
+    }
+
+    /// Новый порт: перезапустить приёмник и переставить хуки, если они стояли.
+    private func changePort(_ port: UInt16) {
+        guard port != state.port else { return }
+        let hooksWereInstalled = HookInstaller.isInstalled(port: state.port)
+        state.port = port
+        save()
+        portAttempts = 0
+        startServer(port: port)
+        if hooksWereInstalled { installHooks() }
+        refreshSettingsModel()
     }
 
     // MARK: - Список
@@ -277,6 +359,10 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         listModel.installHooks = { [weak self] in self?.installHooks() }
         listModel.toggleSnooze = { [weak self] in self?.toggleSnooze() }
+        listModel.openSettings = { [weak self] in
+            self?.popover.performClose(nil)
+            self?.openSettings()
+        }
         listModel.quit = { NSApp.terminate(nil) }
     }
 
@@ -315,6 +401,7 @@ final class PetController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(withTitle: "Отладка: анимация", action: nil, keyEquivalent: "").submenu = debug
         menu.addItem(.separator())
+        menu.addItem(withTitle: "Настройки…", action: #selector(openSettings), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Выйти", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         return menu
     }

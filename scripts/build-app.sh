@@ -34,3 +34,15 @@ PLIST
 # Подпись «для себя», без сертификата разработчика.
 codesign --force --sign - "$APP"
 echo "Готово: $APP"
+
+# `--install` — положить в ~/Applications и перезапустить. Автозапуск привязан к месту приложения,
+# поэтому для каждого дня запускать стоит именно эту копию, а не build/.
+if [[ "${1:-}" == "--install" ]]; then
+    DEST="$HOME/Applications/Klodik.app"
+    pkill -x Klodik || true
+    mkdir -p "$HOME/Applications"
+    rm -rf "$DEST"
+    cp -R "$APP" "$DEST"
+    open "$DEST"
+    echo "Установлено и запущено: $DEST"
+fi

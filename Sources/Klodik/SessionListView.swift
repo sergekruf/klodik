@@ -17,6 +17,7 @@ final class SessionListModel: ObservableObject {
     var hide: (TrackedItem) -> Void = { _ in }
     var installHooks: () -> Void = {}
     var toggleSnooze: () -> Void = {}
+    var openSettings: () -> Void = {}
     var quit: () -> Void = {}
 }
 
@@ -73,6 +74,7 @@ struct SessionListView: View {
             HStack {
                 Button(model.snoozed ? "Не откладывать" : "Отложить на 30 минут") { model.toggleSnooze() }
                 Spacer()
+                Button("Настройки") { model.openSettings() }
                 Button("Выйти") { model.quit() }
             }
             .buttonStyle(.borderless)

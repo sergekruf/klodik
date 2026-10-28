@@ -39,7 +39,8 @@ public final class Tracker {
         "permission_prompt", "elicitation_dialog", "elicitation_url_dialog", "agent_needs_input",
     ]
 
-    public let config: Config
+    /// Окно в днях меняется из настроек на ходу.
+    public var config: Config
     /// Метки «напомнить»: `localId` → когда поставлена. Снимается сама, когда сессию открыли после метки.
     public private(set) var remind: [String: Date] = [:]
     /// «Скрыть до следующей активности»: `localId` → когда скрыта.

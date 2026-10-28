@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 
 /// Состояние Клодика между запусками: ~/Library/Application Support/Klodik/state.json.
-/// Настройки добавятся на шаге 9.
+/// Позиция, метки сессий и настройки.
 public struct AppState: Codable, Equatable {
     public var petOrigin: CGPoint?
     /// Метки «напомнить»: `localId` → когда поставлена.
@@ -11,6 +11,9 @@ public struct AppState: Codable, Equatable {
     public var hidden: [String: Date] = [:]
     /// Порт приёмника событий. Меняется сам, если прежний занят другим приложением.
     public var port: UInt16 = EventServer.defaultPort
+    /// Сессии без активности дольше стольких дней в список не попадают.
+    public var windowDays: Double = 7
+    public var reminderScale = ReminderScale.normal
 
     public init() {}
 
@@ -21,6 +24,9 @@ public struct AppState: Codable, Equatable {
         remind = try c.decodeIfPresent([String: Date].self, forKey: .remind) ?? [:]
         hidden = try c.decodeIfPresent([String: Date].self, forKey: .hidden) ?? [:]
         port = try c.decodeIfPresent(UInt16.self, forKey: .port) ?? EventServer.defaultPort
+        windowDays = try c.decodeIfPresent(Double.self, forKey: .windowDays) ?? 7
+        // Незнакомое значение шкалы (файл от будущей версии) — обычная шкала, а не сброс всего файла.
+        reminderScale = (try? c.decodeIfPresent(ReminderScale.self, forKey: .reminderScale)) ?? .normal
     }
 
     public static var defaultURL: URL {

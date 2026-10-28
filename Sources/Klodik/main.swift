@@ -52,6 +52,20 @@ for (flag, install) in [("--install-hooks", true), ("--uninstall-hooks", false)]
     }
 }
 
+// `Klodik --login-item status|on|off` — автозапуск из терминала (то же, что переключатель в настройках).
+if let i = CommandLine.arguments.firstIndex(of: "--login-item") {
+    let command = i + 1 < CommandLine.arguments.count ? CommandLine.arguments[i + 1] : "status"
+    do {
+        if command == "on" { try LoginItem.set(true) }
+        if command == "off" { try LoginItem.set(false) }
+        print("Автозапуск: \(LoginItem.status.rawValue) (0 — выключен, 1 — включён, 2 — ждёт разрешения, 3 — не найден)")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(Data("Не получилось: \(error)\n".utf8))
+        exit(1)
+    }
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

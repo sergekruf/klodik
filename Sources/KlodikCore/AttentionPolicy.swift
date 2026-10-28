@@ -24,6 +24,8 @@ public struct AttentionPolicy {
     public struct Config {
         /// Шкала напоминаний для серой сессии, которую ещё не открывали: пока ждёт меньше `upTo` — прыжок раз в `every`.
         public var jumpSteps: [(upTo: TimeInterval, every: TimeInterval)] = [(2 * 60, 60), (10 * 60, 30)]
+        /// Когда сессия ждёт дольше последней ступени.
+        public var afterLastStep = Attention.Nudge.jumpContinuously
         /// Серая, которая ждёт дольше этого, не заставляет прыгать (решение пользователя).
         public var grayStaleAfter: TimeInterval = 24 * 3600
         /// Синие, «напомнить», уже открытые и давние серые — изредка помахать.
@@ -61,7 +63,7 @@ public struct AttentionPolicy {
             return Attention(base: base, nudge: .wave(every: config.waveEvery), badge: items.count)
         }
         let waited = now.timeIntervalSince(oldest)
-        let nudge = config.jumpSteps.first { waited < $0.upTo }.map { Attention.Nudge.jump(every: $0.every) } ?? .jumpContinuously
+        let nudge = config.jumpSteps.first { waited < $0.upTo }.map { Attention.Nudge.jump(every: $0.every) } ?? config.afterLastStep
         return Attention(base: base, nudge: nudge, badge: items.count)
     }
 }
