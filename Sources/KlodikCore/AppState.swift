@@ -29,8 +29,12 @@ public struct AppState: Codable, Equatable {
         reminderScale = (try? c.decodeIfPresent(ReminderScale.self, forKey: .reminderScale)) ?? .normal
     }
 
+    /// KLODIK_STATE_DIR — другая папка для state.json (демо-запуск рядом с настоящим Клодиком).
     public static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        if let dir = ProcessInfo.processInfo.environment["KLODIK_STATE_DIR"] {
+            return URL(fileURLWithPath: dir).appendingPathComponent("state.json")
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Klodik/state.json")
     }
 

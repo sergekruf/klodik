@@ -59,11 +59,11 @@ struct SessionListView: View {
             if !model.hooksInstalled {
                 Divider()
                 HStack {
-                    Text("Хуки Claude Code не установлены: не вижу запросов разрешений")
+                    Text("Claude Code не подключён: не вижу запросов разрешений")
                         .font(.caption)
                         .foregroundStyle(.orange)
                     Spacer()
-                    Button("Установить") { model.installHooks() }
+                    Button("Подключить") { model.installHooks() }
                         .font(.caption)
                 }
                 .padding(.horizontal, 12)

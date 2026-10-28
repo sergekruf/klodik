@@ -76,4 +76,29 @@ enum Sprites {
         NSGraphicsContext.restoreGraphicsState()
         try rep.representation(using: .png, properties: [:])?.write(to: url)
     }
+
+    /// `<анимация>-<n>.png` (16×16 → 160×160) и `<анимация>.ffconcat` с длительностями кадров.
+    static func writeFrames(to dir: URL, pixel: Int = 10) throws {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        for anim in PetAnimation.allCases {
+            var concat = "ffconcat version 1.0\n"
+            let frames = PetArt.frames(for: anim)
+            for (n, frame) in frames.enumerated() {
+                let name = "\(anim.rawValue)-\(n).png"
+                guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16 * pixel, pixelsHigh: 16 * pixel,
+                                                 bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                 colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { continue }
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+                image(frame.pixels, pixel: CGFloat(pixel)).draw(in: NSRect(x: 0, y: 0, width: 16 * pixel, height: 16 * pixel))
+                NSGraphicsContext.restoreGraphicsState()
+                try rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name))
+                let duration = frame.duration.isFinite ? frame.duration : 1
+                concat += "file '\(name)'\nduration \(duration)\n"
+            }
+            // ffmpeg берёт длительность последнего кадра, только если файл повторён ещё раз.
+            if let last = frames.indices.last { concat += "file '\(anim.rawValue)-\(last).png'\n" }
+            try concat.write(to: dir.appendingPathComponent("\(anim.rawValue).ffconcat"), atomically: true, encoding: .utf8)
+        }
+    }
 }

@@ -12,6 +12,17 @@ if let i = CommandLine.arguments.firstIndex(of: "--sheet"), i + 1 < CommandLine.
     }
 }
 
+// `Klodik --frames папка` — сохранить кадры каждой анимации и файл длительностей для ffmpeg (GIF для README).
+if let i = CommandLine.arguments.firstIndex(of: "--frames"), i + 1 < CommandLine.arguments.count {
+    do {
+        try Sprites.writeFrames(to: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(Data("Не удалось сохранить кадры: \(error)\n".utf8))
+        exit(1)
+    }
+}
+
 // `Klodik --sessions` — прочитать сессии приложения Claude, напечатать сводку и выйти.
 if CommandLine.arguments.contains("--sessions") {
     let started = Date()

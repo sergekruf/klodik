@@ -4,8 +4,10 @@ import CoreServices
 /// Все сессии вкладки Code из файлов приложения Claude.
 /// При старте читает всё один раз, дальше перечитывает только файлы, о которых сообщил FSEvents.
 public final class SessionStore {
+    /// KLODIK_SESSIONS_DIR — другая папка с сессиями (демо-данные для скриншотов).
     public static var defaultRoot: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        if let dir = ProcessInfo.processInfo.environment["KLODIK_SESSIONS_DIR"] { return URL(fileURLWithPath: dir) }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Claude/claude-code-sessions")
     }
 
