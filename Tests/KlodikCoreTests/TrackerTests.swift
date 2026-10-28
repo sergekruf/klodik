@@ -118,6 +118,22 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(dot(1), .blue)
     }
 
+    func testReturningToClaudeReadsTheSessionOnScreen() {
+        // Сессия 1 открыта в Claude, но закончила, пока пользователь был в другом приложении. Он вернулся в Claude.
+        tracker.update(sessions: [session(1, focused: 30, edge: 3), session(2, focused: 40, edge: 3)])
+        tracker.handle(event(1, .stop, 3), claudeFrontmost: false)
+        XCTAssertEqual(dot(1), .blue)
+        tracker.markOnScreenRead(at: t(1))
+        XCTAssertNil(dot(1))
+        XCTAssertEqual(dot(2), .blue)   // другую сессию он не видел
+    }
+
+    func testReturningToClaudeDoesNotClearGray() {
+        tracker.update(sessions: [session(1, focused: 30, edge: 3, status: .blocked)])
+        tracker.markOnScreenRead(at: t(1))
+        XCTAssertEqual(dot(1), .gray)
+    }
+
     func testFinishingWhileAnotherSessionIsOnScreenIsBlue() {
         tracker.update(sessions: [session(1, focused: 20, edge: 40), session(2, focused: 5, edge: 40)])
         tracker.handle(event(1, .stop, 1), claudeFrontmost: true)

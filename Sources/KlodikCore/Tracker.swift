@@ -116,6 +116,13 @@ public final class Tracker {
         cleanUpMarks()
     }
 
+    /// Пользователь вернулся в Claude: сессия на экране прочитана, даже если закончила, пока он был в другом окне.
+    /// Сам Claude в этом случае `lastFocusedAt` не обновляет — сессию не переключали.
+    public func markOnScreenRead(at date: Date) {
+        guard let id = onScreenId else { return }
+        readByPresence[id] = date
+    }
+
     public func markRemind(_ localId: String, at date: Date) {
         remind[localId] = date
         onMarksChanged?()

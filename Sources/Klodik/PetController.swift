@@ -67,11 +67,16 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         store.loadAll()
         store.startWatching()
+        if front.isClaudeFrontmost { tracker.markOnScreenRead(at: Date()) }
 
         startServer(port: state.port)
         refreshHooksState()
 
-        front.onChange = { [weak self] in self?.scheduleRefresh() }
+        front.onChange = { [weak self] in
+            guard let self else { return }
+            if front.isClaudeFrontmost { tracker.markOnScreenRead(at: Date()) }
+            scheduleRefresh()
+        }
 
         let tick = Timer(timeInterval: Self.tickEvery, repeats: true) { [weak self] _ in self?.refresh() }
         tick.tolerance = 5
