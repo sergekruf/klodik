@@ -3,8 +3,8 @@ import AppKit
 /// Прозрачное окно без рамки поверх всех окон и на всех рабочих столах.
 /// Не забирает фокус у приложения, в котором вы работаете.
 final class PetPanel: NSPanel {
-    init(image: NSImage) {
-        super.init(contentRect: NSRect(origin: .zero, size: image.size),
+    init(size: NSSize) {
+        super.init(contentRect: NSRect(origin: .zero, size: size),
                    styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         level = .floating
@@ -13,7 +13,7 @@ final class PetPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = false
         hidesOnDeactivate = false
-        contentView = PetView(image: image)
+        contentView = PetView(size: size)
     }
 
     override var canBecomeKey: Bool { false }
@@ -22,21 +22,26 @@ final class PetPanel: NSPanel {
 
 /// Рисует Клодика и даёт его перетаскивать. Правый клик открывает `menu`.
 final class PetView: NSView {
-    var image: NSImage { didSet { needsDisplay = true } }
+    /// Текущий кадр. Кладётся прямо в слой, вид ничего не рисует сам.
+    var image: CGImage? {
+        didSet {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)   // без плавного перехода между кадрами
+            layer?.contents = image
+            CATransaction.commit()
+        }
+    }
     /// Вызывается, когда перетаскивание закончилось.
     var onDragEnd: (() -> Void)?
 
-    init(image: NSImage) {
-        self.image = image
-        super.init(frame: NSRect(origin: .zero, size: image.size))
+    init(size: NSSize) {
+        super.init(frame: NSRect(origin: .zero, size: size))
+        wantsLayer = true
+        layer?.magnificationFilter = .nearest   // крупные чёткие пиксели
+        layer?.contentsGravity = .resize
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) не используется") }
-
-    override func draw(_ dirtyRect: NSRect) {
-        NSGraphicsContext.current?.imageInterpolation = .none
-        image.draw(in: bounds)
-    }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
