@@ -23,9 +23,9 @@ public struct Attention: Equatable {
 public struct AttentionPolicy {
     public struct Config {
         /// Шкала напоминаний для серой сессии, которую ещё не открывали: пока ждёт меньше `upTo` — прыжок раз в `every`.
-        public var jumpSteps: [(upTo: TimeInterval, every: TimeInterval)] = [(2 * 60, 60), (10 * 60, 30)]
-        /// Когда сессия ждёт дольше последней ступени.
-        public var afterLastStep = Attention.Nudge.jumpContinuously
+        public var jumpSteps: [(upTo: TimeInterval, every: TimeInterval)] = [(2 * 60, 60)]
+        /// Когда сессия ждёт дольше последней ступени. Без остановки — только в «Настойчиво» (решение пользователя).
+        public var afterLastStep = Attention.Nudge.jump(every: 30)
         /// Серая, которая ждёт дольше этого, не заставляет прыгать (решение пользователя).
         public var grayStaleAfter: TimeInterval = 24 * 3600
         /// Синие, «напомнить», уже открытые и давние серые — изредка помахать.

@@ -16,7 +16,8 @@ final class ReminderScaleTests: XCTestCase {
     func testNormalIsTheDesignScale() {
         XCTAssertEqual(nudge(.normal, waiting: 1), .jump(every: 60))
         XCTAssertEqual(nudge(.normal, waiting: 5), .jump(every: 30))
-        XCTAssertEqual(nudge(.normal, waiting: 15), .jumpContinuously)
+        XCTAssertEqual(nudge(.normal, waiting: 15), .jump(every: 30))
+        XCTAssertEqual(nudge(.normal, waiting: 600), .jump(every: 30))
     }
 
     func testGentleNeverJumpsNonStop() {
