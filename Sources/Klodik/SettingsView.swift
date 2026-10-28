@@ -16,10 +16,14 @@ final class SettingsModel: ObservableObject {
     @Published var loginNeedsApproval = false
     @Published var loginError: String?
     @Published var reminderScale = ReminderScale.normal
+    @Published var hotKeyEnabled = true
+    /// Сочетание занято другим приложением.
+    @Published var hotKeyBusy = false
     @Published var hooksInstalled = false
 
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
     var setReminderScale: (ReminderScale) -> Void = { _ in }
+    var setHotKeyEnabled: (Bool) -> Void = { _ in }
     var toggleHooks: () -> Void = {}
 }
 
@@ -54,6 +58,19 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 Text(model.reminderScale.detail).font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle(isOn: Binding(get: { model.hotKeyEnabled }, set: { model.setHotKeyEnabled($0) })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(HotKey.display) — к следующей сессии")
+                        Text("Открывает сессию, которая дольше всех ждёт ответа. Ещё раз — следующую")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if model.hotKeyEnabled && model.hotKeyBusy {
+                    Text("Сочетание занято другим приложением").font(.caption).foregroundStyle(.orange)
+                }
             }
 
             // Порт приёмника и глубина истории (7 дней) живут только в state.json: обычному пользователю они не нужны.

@@ -20,6 +20,7 @@ public struct TrackedItem: Equatable {
     public var waitingSince: Date
     /// Серую сессию уже открывали после того, как она начала ждать: Клодик из-за неё не прыгает.
     public var openedSinceWaiting: Bool
+    /// Что просит или что сделала: «Bash: npm run build», текст вопроса, итог хода от приложения Claude.
     public var detail: String?
 }
 
@@ -47,6 +48,8 @@ public final class Tracker {
     public private(set) var hidden: [String: Date] = [:]
     /// Метки поменялись — их пора сохранить.
     public var onMarksChanged: (() -> Void)?
+    /// Серая сессия перестала ждать: пользователь ответил, разрешил или отказал. Для сводки за день.
+    public var onWaitEnded: ((WaitRecord) -> Void)?
 
     private var sessions: [String: SessionInfo] = [:]
     private var localByCli: [String: String] = [:]
@@ -60,6 +63,10 @@ public final class Tracker {
     private var stoppedAt: [String: Date] = [:]
     private var workingAt: [String: Date] = [:]
     private var lastEventAt: [String: Date] = [:]
+    /// Что просит серая сессия из хуков: команда, файл, текст вопроса.
+    private var waitDetail: [String: String] = [:]
+    /// Последний инструмент перед запросом: PreToolUse приходит раньше уведомления о вопросе или разрешении.
+    private var pendingTool: [String: String] = [:]
     /// Сессия закончила ход у пользователя на глазах — прочитана до этого момента. По `localId`.
     private var readByPresence: [String: Date] = [:]
 
@@ -83,6 +90,13 @@ public final class Tracker {
 
     public func handle(_ event: HookEvent, claudeFrontmost: Bool) {
         let cli = event.sessionId
+        let grayBefore = grayStart(cli, at: event.at)
+        defer {
+            if let start = grayBefore, grayStart(cli, at: event.at) == nil,
+               let local = localByCli[cli], let s = sessions[local] {
+                onWaitEnded?(WaitRecord(localId: local, title: s.title, start: start, end: event.at))
+            }
+        }
         lastEventAt[cli] = event.at
         switch event.kind {
         case .sessionStart:
@@ -90,19 +104,28 @@ public final class Tracker {
         case .promptSubmit:
             answeredAt[cli] = event.at
             waitingSince[cli] = nil
+            waitDetail[cli] = nil
             workingAt[cli] = event.at
         case .preTool:
             // PreToolUse приходит и перед запросом разрешения, поэтому ожидание он не снимает.
             workingAt[cli] = event.at
+            pendingTool[cli] = event.detail
         case .postTool:
             waitingSince[cli] = nil
+            waitDetail[cli] = nil
             workingAt[cli] = event.at
         case .permissionRequest:
             startWaiting(cli, at: event.at)
+            if let detail = event.detail { waitDetail[cli] = detail }
         case .notification(let type):
-            if Self.questionNotifications.contains(type) { startWaiting(cli, at: event.at) }
+            if Self.questionNotifications.contains(type) {
+                startWaiting(cli, at: event.at)
+                // Текст уведомления общий («Claude needs your permission…»), инструмент из PreToolUse говорит больше.
+                if waitDetail[cli] == nil { waitDetail[cli] = pendingTool[cli] ?? event.detail }
+            }
         case .stop, .stopFailure:
             waitingSince[cli] = nil
+            waitDetail[cli] = nil
             workingAt[cli] = nil
             stoppedAt[cli] = event.at
             if claudeFrontmost, let local = localByCli[cli], local == onScreenId {
@@ -111,6 +134,7 @@ public final class Tracker {
             }
         case .sessionEnd:
             waitingSince[cli] = nil
+            waitDetail[cli] = nil
             workingAt[cli] = nil
         }
         cleanUpMarks()
@@ -155,7 +179,7 @@ public final class Tracker {
             result.append(TrackedItem(localId: s.localId, cliSessionId: s.cliSessionId, title: s.title,
                                       projectName: s.projectName, dot: dot, waitingSince: since,
                                       openedSinceWaiting: dot == .gray && (s.lastFocusedAt ?? .distantPast) > since,
-                                      detail: s.statusDetail))
+                                      detail: detail(s, dot: dot)))
         }
         return result.sorted { $0.waitingSince > $1.waitingSince }
     }
@@ -196,6 +220,20 @@ public final class Tracker {
         let edge = max(s.lastTurnEdgeAt ?? .distantPast, cli.flatMap { stoppedAt[$0] } ?? .distantPast)
         let read = max(s.lastFocusedAt ?? .distantPast, readByPresence[s.localId] ?? .distantPast)
         return edge > read ? (.blue, edge) : nil
+    }
+
+    /// С какого момента сессия ждёт ответа, если она сейчас серая.
+    private func grayStart(_ cli: String, at date: Date) -> Date? {
+        guard let local = localByCli[cli], let s = sessions[local],
+              let state = needState(s, now: date), state.dot == .gray else { return nil }
+        return state.since
+    }
+
+    /// Серая из хуков — что она просит сейчас (итог прошлого хода из файла тут устарел).
+    /// Серая из файла и синяя — итог хода, который приложение Claude записало в файл.
+    private func detail(_ s: SessionInfo, dot: TrackedItem.Dot) -> String? {
+        if dot == .gray, let cli = s.cliSessionId, waitingSince[cli] != nil { return waitDetail[cli] }
+        return s.statusDetail
     }
 
     /// Последний признак жизни сессии: конец хода или новый запрос ответа.

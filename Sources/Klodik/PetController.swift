@@ -13,6 +13,7 @@ final class PetController: NSObject, NSMenuDelegate {
     static let debug = ProcessInfo.processInfo.environment["KLODIK_DEBUG"] != nil
 
     private var state = AppState.load()
+    private var waitLog = WaitLog.load()
     private let content = PetContentView()
     private lazy var panel = PetPanel(content: content)
     private var animator: Animator!
@@ -31,6 +32,8 @@ final class PetController: NSObject, NSMenuDelegate {
     private let listModel = SessionListModel()
     private lazy var popover = makePopover()
 
+    private var hotKey: HotKey?
+    private var nextSession = NextSession()
     private var snoozedUntil: Date?
     private var lastActivityAt = Date()
     /// Точки на прошлом пересчёте — чтобы заметить новое событие. nil до первого пересчёта:
@@ -58,6 +61,11 @@ final class PetController: NSObject, NSMenuDelegate {
         tracker.restore(remind: state.remind, hidden: state.hidden)
         applySettings()
         tracker.onMarksChanged = { [weak self] in self?.saveMarks() }
+        tracker.onWaitEnded = { [weak self] record in
+            guard let self else { return }
+            waitLog.add(record)
+            do { try waitLog.save() } catch { NSLog("Klodik: не удалось сохранить журнал ожиданий: \(error)") }
+        }
 
         store.onChange = { [weak self] in
             guard let self else { return }
@@ -84,6 +92,7 @@ final class PetController: NSObject, NSMenuDelegate {
         tickTimer = tick
 
         setUpListActions()
+        applyHotKey()
         startDemoIfAsked()
         refresh()
 
@@ -133,6 +142,7 @@ final class PetController: NSObject, NSMenuDelegate {
         listModel.now = now
         listModel.snoozed = snoozedUntil != nil
         listModel.formatBroken = store.formatBroken
+        listModel.daySummary = waitLog.summary(on: now)
     }
 
     /// Новая серая — пузырь «ждёт ответа» и взмах, новая синяя — «готово» и радость.
@@ -269,6 +279,11 @@ final class PetController: NSObject, NSMenuDelegate {
             self?.state.reminderScale = scale
             self?.settingsChanged()
         }
+        settingsModel.setHotKeyEnabled = { [weak self] enabled in
+            self?.state.hotKeyEnabled = enabled
+            self?.applyHotKey()
+            self?.settingsChanged()
+        }
         settingsModel.toggleHooks = { [weak self] in self?.toggleHooks() }
 
         let host = NSHostingController(rootView: SettingsView(model: settingsModel))
@@ -292,6 +307,8 @@ final class PetController: NSObject, NSMenuDelegate {
         settingsModel.launchAtLogin = status == .enabled
         settingsModel.loginNeedsApproval = status == .requiresApproval
         settingsModel.reminderScale = state.reminderScale
+        settingsModel.hotKeyEnabled = state.hotKeyEnabled
+        settingsModel.hotKeyBusy = state.hotKeyEnabled && hotKey == nil
         refreshHooksState()
     }
 
@@ -300,6 +317,28 @@ final class PetController: NSObject, NSMenuDelegate {
         applySettings()
         refreshSettingsModel()
         refresh()
+    }
+
+    // MARK: - Горячая клавиша
+
+    private func applyHotKey() {
+        guard state.hotKeyEnabled else {
+            hotKey = nil
+            return
+        }
+        if hotKey == nil {
+            hotKey = HotKey { [weak self] in self?.openNextSession() }
+            if hotKey == nil { NSLog("Klodik: сочетание \(HotKey.display) занято другим приложением") }
+        }
+    }
+
+    /// ⌥⌘K: самая давно ждущая сессия, при повторе — следующая.
+    private func openNextSession() {
+        guard let item = nextSession.pick(from: tracker.items(now: Date()), now: Date()) else {
+            bubble.show("Никто не ждёт", above: panel.frame)
+            return
+        }
+        Self.openInClaude(item)
     }
 
     // MARK: - Список

@@ -14,6 +14,8 @@ public struct AppState: Codable, Equatable {
     /// Сессии без активности дольше стольких дней в список не попадают.
     public var windowDays: Double = 7
     public var reminderScale = ReminderScale.normal
+    /// ⌥⌘K открывает сессию, которая дольше всех ждёт.
+    public var hotKeyEnabled = true
 
     public init() {}
 
@@ -27,6 +29,7 @@ public struct AppState: Codable, Equatable {
         windowDays = try c.decodeIfPresent(Double.self, forKey: .windowDays) ?? 7
         // Незнакомое значение шкалы (файл от будущей версии) — обычная шкала, а не сброс всего файла.
         reminderScale = (try? c.decodeIfPresent(ReminderScale.self, forKey: .reminderScale)) ?? .normal
+        hotKeyEnabled = try c.decodeIfPresent(Bool.self, forKey: .hotKeyEnabled) ?? true
     }
 
     /// KLODIK_STATE_DIR — другая папка для state.json (демо-запуск рядом с настоящим Клодиком).

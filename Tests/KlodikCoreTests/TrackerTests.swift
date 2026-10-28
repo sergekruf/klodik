@@ -264,4 +264,75 @@ final class TrackerTests: XCTestCase {
                                   session(4, focused: 60, edge: 40, status: .blocked)])
         XCTAssertEqual(items().map(\.localId), ["local_1", "local_3", "local_4", "local_2"])
     }
+
+    // MARK: что просит
+
+    func detail(_ n: Int) -> String? { items().first { $0.localId == "local_\(n)" }?.detail }
+
+    func testPermissionShowsWhatIsAsked() {
+        tracker.update(sessions: [session(1, focused: 30, edge: 20)])
+        tracker.handle(HookEvent(sessionId: "cli_1", kind: .permissionRequest("Bash"), detail: "Bash: npm run build", at: t(2)),
+                       claudeFrontmost: false)
+        XCTAssertEqual(detail(1), "Bash: npm run build")
+        tracker.handle(event(1, .postTool("Bash"), 1), claudeFrontmost: false)
+        XCTAssertNil(dot(1))
+    }
+
+    func testQuestionTakesTextFromThePrecedingTool() {
+        tracker.update(sessions: [session(1, focused: 30, edge: 20)])
+        tracker.handle(HookEvent(sessionId: "cli_1", kind: .preTool("AskUserQuestion"), detail: "CSV или Google Sheets?", at: t(3)),
+                       claudeFrontmost: false)
+        tracker.handle(HookEvent(sessionId: "cli_1", kind: .notification("elicitation_dialog"), detail: "Claude has a question", at: t(2)),
+                       claudeFrontmost: false)
+        XCTAssertEqual(detail(1), "CSV или Google Sheets?")
+    }
+
+    func testFileBlockedAndBlueShowTheTurnSummary() {
+        let blocked = SessionInfo(localId: "local_1", cliSessionId: "cli_1", title: "a", projectName: "p", lastFocusedAt: t(30),
+                                  lastTurnEdgeAt: t(5), lastActivityAt: t(5), statusCategory: .blocked, statusDetail: "ждёт выбора обложки")
+        let done = SessionInfo(localId: "local_2", cliSessionId: "cli_2", title: "b", projectName: "p", lastFocusedAt: t(30),
+                               lastTurnEdgeAt: t(5), lastActivityAt: t(5), statusCategory: .completed, statusDetail: "сайт собран")
+        tracker.update(sessions: [blocked, done])
+        XCTAssertEqual(detail(1), "ждёт выбора обложки")
+        XCTAssertEqual(detail(2), "сайт собран")
+    }
+
+    func testHookGrayDoesNotShowStaleSummary() {
+        let s = SessionInfo(localId: "local_1", cliSessionId: "cli_1", title: "a", projectName: "p", lastFocusedAt: t(30),
+                            lastTurnEdgeAt: t(20), lastActivityAt: t(20), statusCategory: .completed, statusDetail: "старый итог")
+        tracker.update(sessions: [s])
+        tracker.handle(event(1, .notification("permission_prompt"), 2), claudeFrontmost: false)
+        XCTAssertEqual(dot(1), .gray)
+        XCTAssertNil(detail(1))
+    }
+
+    // MARK: сводка за день
+
+    func testAnsweringPermissionEndsTheWait() {
+        var ended: [WaitRecord] = []
+        tracker.onWaitEnded = { ended.append($0) }
+        tracker.update(sessions: [session(1, focused: 30, edge: 20)])
+        tracker.handle(event(1, .permissionRequest("Bash"), 6), claudeFrontmost: false)
+        tracker.handle(event(1, .preTool("Bash"), 5), claudeFrontmost: false)   // ещё ждёт
+        XCTAssertTrue(ended.isEmpty)
+        tracker.handle(event(1, .postTool("Bash"), 2), claudeFrontmost: false)
+        XCTAssertEqual(ended, [WaitRecord(localId: "local_1", title: "Сессия 1", start: t(6), end: t(2))])
+    }
+
+    func testAnsweringABlockedTurnEndsTheWait() {
+        var ended: [WaitRecord] = []
+        tracker.onWaitEnded = { ended.append($0) }
+        tracker.update(sessions: [session(1, focused: 30, edge: 20, status: .blocked)])
+        tracker.handle(event(1, .promptSubmit, 4), claudeFrontmost: true)
+        XCTAssertEqual(ended.map(\.start), [t(20)])
+        XCTAssertEqual(ended.map(\.end), [t(4)])
+    }
+
+    func testBlueSessionDoesNotCountAsWait() {
+        var ended: [WaitRecord] = []
+        tracker.onWaitEnded = { ended.append($0) }
+        tracker.update(sessions: [session(1, focused: 30, edge: 20, status: .completed)])
+        tracker.handle(event(1, .promptSubmit, 4), claudeFrontmost: true)
+        XCTAssertTrue(ended.isEmpty)
+    }
 }

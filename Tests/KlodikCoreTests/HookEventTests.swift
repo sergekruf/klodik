@@ -56,4 +56,30 @@ final class HookEventTests: XCTestCase {
     func testBrokenJsonIsIgnored() {
         XCTAssertNil(parse(#"{"session_id": "a", "hook_event_name": "#))
     }
+
+    // MARK: что просит
+
+    func testRequestDetails() {
+        XCTAssertEqual(parse(common("PermissionRequest", #", "tool_name": "Bash", "tool_input": {"command": "npm run build\nnpm test"}"#))?.detail,
+                       "Bash: npm run build")
+        XCTAssertEqual(parse(common("PreToolUse", #", "tool_name": "Edit", "tool_input": {"file_path": "/Users/x/p/Tracker.swift"}"#))?.detail,
+                       "Edit: Tracker.swift")
+        XCTAssertEqual(parse(common("PreToolUse", #", "tool_name": "WebFetch", "tool_input": {"url": "https://github.com/a/b"}"#))?.detail,
+                       "WebFetch: github.com")
+        XCTAssertEqual(parse(common("PreToolUse", #", "tool_name": "mcp__ccd_session__start_session", "tool_input": {}"#))?.detail,
+                       "start_session")
+        XCTAssertEqual(parse(common("PreToolUse",
+                                    #", "tool_name": "AskUserQuestion", "tool_input": {"questions": [{"question": "CSV или Google Sheets?"}]}"#))?.detail,
+                       "CSV или Google Sheets?")
+        XCTAssertEqual(parse(common("Notification", #", "message": "Claude needs your permission", "notification_type": "permission_prompt""#))?.detail,
+                       "Claude needs your permission")
+        XCTAssertNil(parse(common("Stop"))?.detail)
+    }
+
+    func testLongDetailIsClipped() {
+        let long = String(repeating: "a", count: 300)
+        let detail = parse(common("PermissionRequest", #", "tool_name": "Bash", "tool_input": {"command": "\#(long)"}"#))?.detail
+        XCTAssertEqual(detail?.count, 120)
+        XCTAssertEqual(detail?.last, "…")
+    }
 }

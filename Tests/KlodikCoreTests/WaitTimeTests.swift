@@ -16,4 +16,12 @@ final class WaitTimeTests: XCTestCase {
     func testNegativeIsJustNow() {
         XCTAssertEqual(WaitTime.short(-5), "только что")
     }
+
+    func testDurationForDaySummary() {
+        XCTAssertEqual(WaitTime.duration(20), "меньше минуты")
+        XCTAssertEqual(WaitTime.duration(4 * 60 + 30), "4 мин")
+        XCTAssertEqual(WaitTime.duration(3600), "1 ч")
+        XCTAssertEqual(WaitTime.duration(80 * 60), "1 ч 20 мин")
+        XCTAssertEqual(WaitTime.duration(50 * 3600), "2 дн")
+    }
 }

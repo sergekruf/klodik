@@ -11,6 +11,8 @@ final class SessionListModel: ObservableObject {
     @Published var hooksInstalled = true
     /// Приёмник событий не запустился — текст для пользователя.
     @Published var serverProblem: String?
+    /// Как быстро сегодня отвечал на запросы. nil — сегодня ответов ещё не было.
+    @Published var daySummary: DaySummary?
 
     var open: (TrackedItem) -> Void = { _ in }
     var toggleRemind: (TrackedItem) -> Void = { _ in }
@@ -70,6 +72,17 @@ struct SessionListView: View {
                 .padding(.vertical, 6)
             }
 
+            if let summary = model.daySummary {
+                Divider()
+                Text("Сегодня ответов: \(summary.answered), в среднем через \(WaitTime.duration(summary.average)). "
+                     + "Дольше всех ждала «\(summary.longest.title)»: \(WaitTime.duration(summary.longest.duration))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+            }
+
             Divider()
             HStack {
                 Button(model.snoozed ? "Не откладывать" : "Отложить на 30 минут") { model.toggleSnooze() }
@@ -82,7 +95,7 @@ struct SessionListView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .frame(width: 320)
+        .frame(width: 340)
     }
 }
 
@@ -111,6 +124,9 @@ private struct SessionRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title).lineLimit(1)
                 Text(item.projectName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if let detail = item.detail {
+                    Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                }
             }
             Spacer(minLength: 4)
             if reminded && item.dot != .remind {
