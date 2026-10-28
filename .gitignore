@@ -3,3 +3,5 @@ build/
 sandbox-hooks/
 .DS_Store
 .swiftpm/
+CLAUDE.md
+*.textClipping
