@@ -241,11 +241,11 @@ final class TrackerTests: XCTestCase {
 
     // MARK: порядок
 
-    func testGrayFirstThenOldestFirst() {
+    func testNewestFirstWhateverTheDot() {
         tracker.update(sessions: [session(1, focused: 60, edge: 5, status: .completed),
                                   session(2, focused: 60, edge: 50, status: .completed),
                                   session(3, focused: 60, edge: 10, status: .blocked),
                                   session(4, focused: 60, edge: 40, status: .blocked)])
-        XCTAssertEqual(items().map(\.localId), ["local_4", "local_3", "local_2", "local_1"])
+        XCTAssertEqual(items().map(\.localId), ["local_1", "local_3", "local_4", "local_2"])
     }
 }

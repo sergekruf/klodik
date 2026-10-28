@@ -16,7 +16,7 @@ public struct TrackedItem: Equatable {
     public var title: String
     public var projectName: String
     public var dot: Dot
-    /// С какого момента сессия ждёт (для «12 мин» и порядка в списке).
+    /// С какого момента сессия ждёт: для «12 мин» и порядка в списке (свежие сверху).
     public var waitingSince: Date
     /// Серую сессию уже открывали после того, как она начала ждать: Клодик из-за неё не прыгает.
     public var openedSinceWaiting: Bool
@@ -131,7 +131,7 @@ public final class Tracker {
         onMarksChanged?()
     }
 
-    /// Серые, потом синие и «напомнить»; внутри — кто дольше ждёт, тот выше.
+    /// Сверху самые свежие: кто позже начал ждать, тот выше, независимо от цвета точки (решение пользователя).
     public func items(now: Date) -> [TrackedItem] {
         let windowStart = now.addingTimeInterval(-config.windowDays * 24 * 3600)
         var result: [TrackedItem] = []
@@ -150,10 +150,7 @@ public final class Tracker {
                                       openedSinceWaiting: dot == .gray && (s.lastFocusedAt ?? .distantPast) > since,
                                       detail: s.statusDetail))
         }
-        return result.sorted {
-            if ($0.dot == .gray) != ($1.dot == .gray) { return $0.dot == .gray }
-            return $0.waitingSince < $1.waitingSince
-        }
+        return result.sorted { $0.waitingSince > $1.waitingSince }
     }
 
     /// `localId` сессий, которые сейчас работают.
