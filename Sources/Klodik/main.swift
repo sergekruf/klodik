@@ -23,8 +23,15 @@ if CommandLine.arguments.contains("--sessions") {
     print("Папка: \(store.root.path)")
     print("Сессий: \(store.sessions.count), формат сломан: \(store.formatBroken), чтение: \(Int(elapsed * 1000)) мс")
     print("Неархивных с активностью за 7 дней: \(recent.count), из них с итогом blocked: \(recent.filter { $0.statusCategory == .blocked }.count)")
-    for s in recent.sorted(by: { ($0.lastActivityAt ?? .distantPast) > ($1.lastActivityAt ?? .distantPast) }).prefix(5) {
-        print("  · \(s.title) [\(s.projectName)] \(s.statusCategory.map { "\($0)" } ?? "—")")
+    let tracker = Tracker()
+    tracker.update(sessions: Array(store.sessions.values))
+    let items = tracker.items(now: Date())
+    let gray = items.filter { $0.dot == .gray }
+    print("Список Клодика: серых \(gray.count) (из них открывали \(gray.filter(\.openedSinceWaiting).count)), синих \(items.filter { $0.dot == .blue }.count)")
+    for item in items {
+        let minutes = Int(Date().timeIntervalSince(item.waitingSince) / 60)
+        let dot = item.dot == .gray ? (item.openedSinceWaiting ? "◌" : "●") : "◆"
+        print("  \(dot) \(item.title) [\(item.projectName)] — ждёт \(minutes) мин")
     }
     exit(0)
 }
