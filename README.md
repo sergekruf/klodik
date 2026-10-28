@@ -16,11 +16,11 @@
 
 Автор показывает Клодика в работе, 2 минуты со звуком. Названия сессий и переписки замазаны.
 
-<a href="https://github.com/sergekruf/klodik/raw/main/docs/media/klodik-demo.mp4"><img src="docs/media/video-poster.jpg" width="560" alt="Смотреть видео: Клодик в работе"></a>
 
 
+https://github.com/user-attachments/assets/4b45dd4e-160a-4153-82b0-3f1358c62271
 
-[▶ Смотреть видео](https://github.com/sergekruf/klodik/raw/main/docs/media/klodik-demo.mp4)
+
 
 ## Что он умеет
 
