@@ -16,7 +16,11 @@
 
 Показываю, как Клодик работает у меня каждый день, 2 минуты со звуком.
 
-https://github.com/user-attachments/assets/4b45dd4e-160a-4153-82b0-3f1358c62271
+
+
+https://github.com/user-attachments/assets/baba8fa6-3eba-478a-84c3-d66fe0d9cad1
+
+
 
 ## Что он умеет
 
