@@ -1,4 +1,5 @@
 import AppKit
+import KlodikCore
 
 // `Klodik --sheet путь.png` — нарисовать все анимации на одном листе и выйти.
 if let i = CommandLine.arguments.firstIndex(of: "--sheet"), i + 1 < CommandLine.arguments.count {
@@ -9,6 +10,23 @@ if let i = CommandLine.arguments.firstIndex(of: "--sheet"), i + 1 < CommandLine.
         FileHandle.standardError.write(Data("Не удалось сохранить лист: \(error)\n".utf8))
         exit(1)
     }
+}
+
+// `Klodik --sessions` — прочитать сессии приложения Claude, напечатать сводку и выйти.
+if CommandLine.arguments.contains("--sessions") {
+    let started = Date()
+    let store = SessionStore()
+    store.loadAll()
+    let elapsed = Date().timeIntervalSince(started)
+    let weekAgo = Date().addingTimeInterval(-7 * 24 * 3600)
+    let recent = store.sessions.values.filter { !$0.isArchived && ($0.lastActivityAt ?? .distantPast) > weekAgo }
+    print("Папка: \(store.root.path)")
+    print("Сессий: \(store.sessions.count), формат сломан: \(store.formatBroken), чтение: \(Int(elapsed * 1000)) мс")
+    print("Неархивных с активностью за 7 дней: \(recent.count), из них с итогом blocked: \(recent.filter { $0.statusCategory == .blocked }.count)")
+    for s in recent.sorted(by: { ($0.lastActivityAt ?? .distantPast) > ($1.lastActivityAt ?? .distantPast) }).prefix(5) {
+        print("  · \(s.title) [\(s.projectName)] \(s.statusCategory.map { "\($0)" } ?? "—")")
+    }
+    exit(0)
 }
 
 let app = NSApplication.shared
