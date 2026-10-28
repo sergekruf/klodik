@@ -24,7 +24,9 @@ public struct AttentionPolicy {
     public struct Config {
         /// Шкала напоминаний для серой сессии, которую ещё не открывали: пока ждёт меньше `upTo` — прыжок раз в `every`.
         public var jumpSteps: [(upTo: TimeInterval, every: TimeInterval)] = [(2 * 60, 60), (10 * 60, 30)]
-        /// Синие, «напомнить» и уже открытые серые — изредка помахать.
+        /// Серая, которая ждёт дольше этого, не заставляет прыгать (решение пользователя).
+        public var grayStaleAfter: TimeInterval = 24 * 3600
+        /// Синие, «напомнить», уже открытые и давние серые — изредка помахать.
         public var waveEvery: TimeInterval = 5 * 60
         /// Список пуст и ничего не происходит — уснуть.
         public var sleepAfter: TimeInterval = 15 * 60
@@ -52,8 +54,10 @@ public struct AttentionPolicy {
         let silenced = claudeFrontmost || (snoozedUntil.map { $0 > now } ?? false)
         guard !items.isEmpty, !silenced else { return Attention(base: base, nudge: .none, badge: items.count) }
 
-        let unopenedGray = items.filter { $0.dot == .gray && !$0.openedSinceWaiting }
-        guard let oldest = unopenedGray.map(\.waitingSince).min() else {
+        let freshUnopenedGray = items.filter {
+            $0.dot == .gray && !$0.openedSinceWaiting && now.timeIntervalSince($0.waitingSince) < config.grayStaleAfter
+        }
+        guard let oldest = freshUnopenedGray.map(\.waitingSince).min() else {
             return Attention(base: base, nudge: .wave(every: config.waveEvery), badge: items.count)
         }
         let waited = now.timeIntervalSince(oldest)

@@ -40,6 +40,11 @@ final class AttentionPolicyTests: XCTestCase {
         XCTAssertEqual(attention([item(.gray, waiting: 60, opened: true)]).nudge, .wave(every: 300))
     }
 
+    func testGrayWaitingOverADayOnlyWaves() {
+        XCTAssertEqual(attention([item(.gray, waiting: 24 * 60)]).nudge, .wave(every: 300))
+        XCTAssertEqual(attention([item(.gray, waiting: 4 * 24 * 60), item(.gray, waiting: 3)]).nudge, .jump(every: 30))
+    }
+
     // MARK: синие и «напомнить»
 
     func testBlueAndRemindWaveSometimes() {
