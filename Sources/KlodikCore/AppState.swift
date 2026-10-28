@@ -2,11 +2,23 @@ import Foundation
 import CoreGraphics
 
 /// Состояние Клодика между запусками: ~/Library/Application Support/Klodik/state.json.
-/// Метки «напомнить», скрытые сессии и настройки добавятся на следующих шагах.
+/// Настройки добавятся на шаге 9.
 public struct AppState: Codable, Equatable {
     public var petOrigin: CGPoint?
+    /// Метки «напомнить»: `localId` → когда поставлена.
+    public var remind: [String: Date] = [:]
+    /// «Скрыть до следующей активности»: `localId` → когда скрыта.
+    public var hidden: [String: Date] = [:]
 
     public init() {}
+
+    /// Каждое поле необязательно: файл от старой версии Клодика читается без потерь.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        petOrigin = try c.decodeIfPresent(CGPoint.self, forKey: .petOrigin)
+        remind = try c.decodeIfPresent([String: Date].self, forKey: .remind) ?? [:]
+        hidden = try c.decodeIfPresent([String: Date].self, forKey: .hidden) ?? [:]
+    }
 
     public static var defaultURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
