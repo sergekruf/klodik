@@ -107,8 +107,12 @@ public final class SessionStore {
     /// Одна сессия может лежать копиями в папках разных аккаунтов — побеждает самая свежая по активности.
     @discardableResult
     private func read(_ path: String) -> Bool {
-        guard let data = FileManager.default.contents(atPath: path),
-              let info = SessionFile.parse(data) else { return false }
+        // Файлы сессий вместе весят десятки мегабайт: без своего autoreleasepool прочитанные данные
+        // копятся до конца обхода, и процесс навсегда остаётся с раздутой кучей.
+        let parsed: SessionInfo? = autoreleasepool {
+            FileManager.default.contents(atPath: path).flatMap(SessionFile.parse)
+        }
+        guard let info = parsed else { return false }
         idByPath[path] = info.localId
         if let current = sessions[info.localId] {
             if current == info { return false }
