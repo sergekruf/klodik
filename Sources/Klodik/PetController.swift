@@ -194,7 +194,6 @@ final class PetController: NSObject, NSMenuDelegate {
         switch serverState {
         case .ready:
             listModel.serverProblem = nil
-            settingsModel.listeningPort = port
             if port != state.port {
                 let hooksWereInstalled = HookInstaller.isInstalled(port: state.port)
                 NSLog("Klodik: порт \(state.port) занят, слушаю \(port)")
@@ -265,11 +264,6 @@ final class PetController: NSObject, NSMenuDelegate {
             self?.state.reminderScale = scale
             self?.settingsChanged()
         }
-        settingsModel.setWindowDays = { [weak self] days in
-            self?.state.windowDays = Double(days)
-            self?.settingsChanged()
-        }
-        settingsModel.applyPort = { [weak self] port in self?.changePort(port) }
         settingsModel.toggleHooks = { [weak self] in self?.toggleHooks() }
 
         let host = NSHostingController(rootView: SettingsView(model: settingsModel))
@@ -293,8 +287,6 @@ final class PetController: NSObject, NSMenuDelegate {
         settingsModel.launchAtLogin = status == .enabled
         settingsModel.loginNeedsApproval = status == .requiresApproval
         settingsModel.reminderScale = state.reminderScale
-        settingsModel.windowDays = Int(state.windowDays)
-        settingsModel.portText = String(state.port)
         refreshHooksState()
     }
 
@@ -303,18 +295,6 @@ final class PetController: NSObject, NSMenuDelegate {
         applySettings()
         refreshSettingsModel()
         refresh()
-    }
-
-    /// Новый порт: перезапустить приёмник и переставить хуки, если они стояли.
-    private func changePort(_ port: UInt16) {
-        guard port != state.port else { return }
-        let hooksWereInstalled = HookInstaller.isInstalled(port: state.port)
-        state.port = port
-        save()
-        portAttempts = 0
-        startServer(port: port)
-        if hooksWereInstalled { installHooks() }
-        refreshSettingsModel()
     }
 
     // MARK: - Список
@@ -390,16 +370,6 @@ final class PetController: NSObject, NSMenuDelegate {
         let hooks = menu.addItem(withTitle: "", action: #selector(toggleHooks), keyEquivalent: "")
         hooks.target = self
         hooks.tag = 2
-
-        // Временное: включить любую анимацию руками.
-        let debug = NSMenu()
-        for anim in PetAnimation.allCases {
-            let item = debug.addItem(withTitle: anim.rawValue, action: #selector(debugPlay(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = anim.rawValue
-        }
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Отладка: анимация", action: nil, keyEquivalent: "").submenu = debug
         menu.addItem(.separator())
         menu.addItem(withTitle: "Настройки…", action: #selector(openSettings), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Выйти", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
@@ -409,12 +379,7 @@ final class PetController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTag: 1)?.title = snoozedUntil == nil ? "Отложить на 30 минут" : "Не откладывать"
         refreshHooksState()
-        menu.item(withTag: 2)?.title = listModel.hooksInstalled ? "Удалить хуки Claude Code" : "Установить хуки Claude Code"
-    }
-
-    @objc private func debugPlay(_ sender: NSMenuItem) {
-        guard let name = sender.representedObject as? String, let anim = PetAnimation(rawValue: name) else { return }
-        if anim.loops { animator.setBase(anim) } else { animator.playOnce(anim) }
+        menu.item(withTag: 2)?.title = listModel.hooksInstalled ? "Отключить от Claude Code" : "Подключить к Claude Code"
     }
 
     /// KLODIK_DEMO=<анимация> крутит её без остановки — для замеров нагрузки.

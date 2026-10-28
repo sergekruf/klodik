@@ -16,16 +16,10 @@ final class SettingsModel: ObservableObject {
     @Published var loginNeedsApproval = false
     @Published var loginError: String?
     @Published var reminderScale = ReminderScale.normal
-    @Published var windowDays = 7
-    @Published var portText = ""
-    @Published var portError: String?
-    @Published var listeningPort: UInt16?
     @Published var hooksInstalled = false
 
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
     var setReminderScale: (ReminderScale) -> Void = { _ in }
-    var setWindowDays: (Int) -> Void = { _ in }
-    var applyPort: (UInt16) -> Void = { _ in }
     var toggleHooks: () -> Void = {}
 }
 
@@ -60,37 +54,19 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 Text(model.reminderScale.detail).font(.caption).foregroundStyle(.secondary)
-
-                Stepper(value: Binding(get: { model.windowDays }, set: { model.setWindowDays($0) }), in: 1...30) {
-                    Text("Сессии за последние \(model.windowDays) дн.")
-                }
             }
 
-            Section("Хуки Claude Code") {
+            // Порт приёмника и глубина истории (7 дней) живут только в state.json: обычному пользователю они не нужны.
+            Section("Claude Code") {
                 HStack {
-                    Text(model.hooksInstalled ? "Установлены" : "Не установлены")
-                        .foregroundStyle(model.hooksInstalled ? Color.secondary : Color.orange)
-                    Spacer()
-                    Button(model.hooksInstalled ? "Удалить" : "Установить") { model.toggleHooks() }
-                }
-                HStack {
-                    TextField("Порт", text: $model.portText)
-                        .frame(width: 90)
-                    Button("Применить") {
-                        if let port = UInt16(model.portText.trimmingCharacters(in: .whitespaces)), port >= 1024 {
-                            model.portError = nil
-                            model.applyPort(port)
-                        } else {
-                            model.portError = "Порт — число от 1024 до 65535"
-                        }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.hooksInstalled ? "Подключён" : "Не подключён")
+                            .foregroundStyle(model.hooksInstalled ? Color.primary : Color.orange)
+                        Text("Хуки в ~/.claude/settings.json: без них Клодик не видит запросы разрешений")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if let port = model.listeningPort {
-                        Text("слушаю \(String(port))").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                if let error = model.portError {
-                    Text(error).font(.caption).foregroundStyle(.orange)
+                    Button(model.hooksInstalled ? "Отключить" : "Подключить") { model.toggleHooks() }
                 }
             }
         }
