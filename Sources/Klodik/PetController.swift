@@ -367,7 +367,7 @@ final class PetController: NSObject, NSMenuDelegate {
     }
 
     static func openInClaude(_ item: TrackedItem) {
-        if let cli = item.cliSessionId, let url = URL(string: "claude://code/continue?session=\(cli)") {
+        if let url = SessionLink.url(localId: item.localId) {
             NSWorkspace.shared.open(url)
         } else if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: FrontAppWatcher.claudeBundleId) {
             NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
