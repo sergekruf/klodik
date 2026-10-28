@@ -39,6 +39,19 @@ if CommandLine.arguments.contains("--sessions") {
     exit(0)
 }
 
+// `Klodik --install-hooks` / `--uninstall-hooks` — то же, что пункт меню, из терминала.
+for (flag, install) in [("--install-hooks", true), ("--uninstall-hooks", false)] where CommandLine.arguments.contains(flag) {
+    let port = AppState.load().port
+    do {
+        if install { try HookInstaller.install(port: port) } else { try HookInstaller.uninstall() }
+        print(install ? "Хуки поставлены на порт \(port): \(HookInstaller.defaultSettingsURL.path)" : "Хуки Клодика убраны")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(Data("Не получилось: \(error)\n".utf8))
+        exit(1)
+    }
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

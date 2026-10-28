@@ -8,10 +8,14 @@ final class SessionListModel: ObservableObject {
     @Published var now = Date()
     @Published var snoozed = false
     @Published var formatBroken = false
+    @Published var hooksInstalled = true
+    /// Приёмник событий не запустился — текст для пользователя.
+    @Published var serverProblem: String?
 
     var open: (TrackedItem) -> Void = { _ in }
     var toggleRemind: (TrackedItem) -> Void = { _ in }
     var hide: (TrackedItem) -> Void = { _ in }
+    var installHooks: () -> Void = {}
     var toggleSnooze: () -> Void = {}
     var quit: () -> Void = {}
 }
@@ -46,12 +50,23 @@ struct SessionListView: View {
             }
 
             if model.formatBroken {
+                Warning(text: "Не читаются файлы сессий Claude — слежу только по хукам")
+            }
+            if let problem = model.serverProblem {
+                Warning(text: problem)
+            }
+            if !model.hooksInstalled {
                 Divider()
-                Text("Не читаются файлы сессий Claude — слежу только по хукам")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                HStack {
+                    Text("Хуки Claude Code не установлены: не вижу запросов разрешений")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Spacer()
+                    Button("Установить") { model.installHooks() }
+                        .font(.caption)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
             }
 
             Divider()
@@ -66,6 +81,19 @@ struct SessionListView: View {
             .padding(.vertical, 8)
         }
         .frame(width: 320)
+    }
+}
+
+private struct Warning: View {
+    let text: String
+
+    var body: some View {
+        Divider()
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
     }
 }
 

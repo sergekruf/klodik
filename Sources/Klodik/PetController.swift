@@ -9,6 +9,8 @@ final class PetController: NSObject, NSMenuDelegate {
     static let snoozeFor: TimeInterval = 30 * 60
     /// Раз в столько пересчитать всё: эскалация по времени, «работает» и сон гаснут сами.
     static let tickEvery: TimeInterval = 30
+    /// KLODIK_DEBUG=1 — писать каждое событие хука в журнал.
+    static let debug = ProcessInfo.processInfo.environment["KLODIK_DEBUG"] != nil
 
     private var state = AppState.load()
     private let content = PetContentView()
@@ -16,7 +18,10 @@ final class PetController: NSObject, NSMenuDelegate {
     private var animator: Animator!
 
     private let store = SessionStore()
-    private let server = EventServer()
+    private var server: EventServer?
+    /// Сколько соседних портов уже перепробовали, если основной занят.
+    private var portAttempts = 0
+    static let maxPortAttempts = 10
     private let tracker = Tracker()
     private let policy = AttentionPolicy()
     private let front = FrontAppWatcher()
@@ -60,14 +65,8 @@ final class PetController: NSObject, NSMenuDelegate {
         store.loadAll()
         store.startWatching()
 
-        server.onState = { NSLog("Klodik: приёмник событий: \(String(describing: $0))") }
-        server.onEvent = { [weak self] event in
-            guard let self else { return }
-            tracker.handle(event, claudeFrontmost: front.isClaudeFrontmost)
-            lastActivityAt = event.at
-            scheduleRefresh()
-        }
-        server.start()
+        startServer(port: state.port)
+        refreshHooksState()
 
         front.onChange = { [weak self] in self?.scheduleRefresh() }
 
@@ -167,6 +166,75 @@ final class PetController: NSObject, NSMenuDelegate {
         nudgeTimer = timer
     }
 
+    // MARK: - Приёмник и хуки
+
+    private func startServer(port: UInt16) {
+        server?.stop()
+        let server = EventServer(port: port)
+        server.onEvent = { [weak self] event in
+            guard let self else { return }
+            if Self.debug { NSLog("Klodik: событие \(String(describing: event.kind)) от сессии \(event.sessionId)") }
+            tracker.handle(event, claudeFrontmost: front.isClaudeFrontmost)
+            lastActivityAt = event.at
+            scheduleRefresh()
+        }
+        server.onState = { [weak self] in self?.serverStateChanged($0, port: port) }
+        server.start()
+        self.server = server
+    }
+
+    /// Порт занят — пробуем соседний. Занялся другой порт — переставляем на него свои хуки.
+    private func serverStateChanged(_ serverState: EventServer.State, port: UInt16) {
+        switch serverState {
+        case .ready:
+            listModel.serverProblem = nil
+            if port != state.port {
+                let hooksWereInstalled = HookInstaller.isInstalled(port: state.port)
+                NSLog("Klodik: порт \(state.port) занят, слушаю \(port)")
+                state.port = port
+                save()
+                if hooksWereInstalled { installHooks() }
+            }
+        case .failed(let reason):
+            NSLog("Klodik: приёмник на порту \(port) не запустился: \(reason)")
+            if portAttempts < Self.maxPortAttempts {
+                portAttempts += 1
+                startServer(port: port + 1)
+            } else {
+                listModel.serverProblem = "Порты \(state.port)–\(port) заняты: Клодик не слышит хуки"
+            }
+        }
+        refreshHooksState()
+    }
+
+    private func refreshHooksState() {
+        listModel.hooksInstalled = HookInstaller.isInstalled(port: state.port)
+    }
+
+    @objc private func toggleHooks() {
+        if listModel.hooksInstalled { uninstallHooks() } else { installHooks() }
+    }
+
+    private func installHooks() {
+        do {
+            try HookInstaller.install(port: state.port)
+        } catch {
+            NSLog("Klodik: не удалось поставить хуки: \(error)")
+            bubble.show("Не получилось: ~/.claude/settings.json не читается", above: panel.frame, for: 5)
+        }
+        refreshHooksState()
+    }
+
+    private func uninstallHooks() {
+        do {
+            try HookInstaller.uninstall()
+        } catch {
+            NSLog("Klodik: не удалось убрать хуки: \(error)")
+            bubble.show("Не получилось: ~/.claude/settings.json не читается", above: panel.frame, for: 5)
+        }
+        refreshHooksState()
+    }
+
     // MARK: - Список
 
     private func makePopover() -> NSPopover {
@@ -184,6 +252,7 @@ final class PetController: NSObject, NSMenuDelegate {
             return
         }
         refresh()
+        refreshHooksState()
         NSApp.activate(ignoringOtherApps: true)   // иначе список не получит Esc и клики мимо
         popover.show(relativeTo: content.sprite.bounds, of: content.sprite, preferredEdge: .maxY)
     }
@@ -206,6 +275,7 @@ final class PetController: NSObject, NSMenuDelegate {
             self?.tracker.hide(item.localId, at: Date())
             self?.refresh()
         }
+        listModel.installHooks = { [weak self] in self?.installHooks() }
         listModel.toggleSnooze = { [weak self] in self?.toggleSnooze() }
         listModel.quit = { NSApp.terminate(nil) }
     }
@@ -231,6 +301,9 @@ final class PetController: NSObject, NSMenuDelegate {
         let snooze = menu.addItem(withTitle: "", action: #selector(toggleSnooze), keyEquivalent: "")
         snooze.target = self
         snooze.tag = 1
+        let hooks = menu.addItem(withTitle: "", action: #selector(toggleHooks), keyEquivalent: "")
+        hooks.target = self
+        hooks.tag = 2
 
         // Временное: включить любую анимацию руками.
         let debug = NSMenu()
@@ -248,6 +321,8 @@ final class PetController: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTag: 1)?.title = snoozedUntil == nil ? "Отложить на 30 минут" : "Не откладывать"
+        refreshHooksState()
+        menu.item(withTag: 2)?.title = listModel.hooksInstalled ? "Удалить хуки Claude Code" : "Установить хуки Claude Code"
     }
 
     @objc private func debugPlay(_ sender: NSMenuItem) {

@@ -13,7 +13,7 @@ final class EventServerTests: XCTestCase {
         return (server, port)
     }
 
-    func post(_ port: UInt16, path: String = "/event", method: String = "POST", body: String) -> Int {
+    func post(_ port: UInt16, path: String = EventServer.path, method: String = "POST", body: String) -> Int {
         var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
         request.httpMethod = method
         if method == "POST" { request.httpBody = Data(body.utf8) }

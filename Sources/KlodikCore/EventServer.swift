@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-/// HTTP-приёмник событий хуков: `POST /event` на 127.0.0.1. Отвечает сразу пустым `200` —
+/// HTTP-приёмник событий хуков: `POST /klodik/event` на 127.0.0.1. Отвечает сразу пустым `200` —
 /// никаких решений за пользователя (важно для `PermissionRequest`), и Claude не ждёт Клодика.
 public final class EventServer {
     public enum State: Equatable {
@@ -11,6 +11,8 @@ public final class EventServer {
     }
 
     public static let defaultPort: UInt16 = 47821
+    /// Адрес в URL хука. Своё имя в пути — чтобы по нему отличать хуки Клодика от чужих в settings.json.
+    public static let path = "/klodik/event"
     /// Сколько ждать запрос от открытого соединения, прежде чем закрыть его.
     static let connectionTimeout: TimeInterval = 5
 
@@ -85,7 +87,7 @@ public final class EventServer {
             case .invalid:
                 self.respond(connection, "400 Bad Request")
             case let .request(method, path, body):
-                guard method == "POST", path == "/event" else {
+                guard method == "POST", path == Self.path else {
                     self.respond(connection, "404 Not Found")
                     return
                 }
