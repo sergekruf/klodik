@@ -33,6 +33,9 @@ if CommandLine.arguments.contains("--sessions") {
         let dot = item.dot == .gray ? (item.openedSinceWaiting ? "◌" : "●") : "◆"
         print("  \(dot) \(item.title) [\(item.projectName)] — ждёт \(minutes) мин")
     }
+    let attention = AttentionPolicy().attention(items: items, workingCount: 0, now: Date(), claudeFrontmost: false,
+                                                snoozedUntil: nil, lastActivityAt: Date())
+    print("Клодик сейчас: \(attention)")
     exit(0)
 }
 
