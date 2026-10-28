@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: PetPanel!
     private var animator: Animator!
     private var demoTimer: Timer?
+    private let server = EventServer()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         panel = PetPanel(size: Sprites.size)
@@ -20,6 +21,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Подключили или отключили монитор — проверить, что Клодик не остался за экраном.
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
                                                object: nil, queue: .main) { [weak self] _ in self?.placePanel() }
+
+        // Пока нет трекера (шаг 5), события хуков только пишутся в системный журнал.
+        server.onState = { NSLog("Klodik: приёмник событий: \(String(describing: $0))") }
+        server.onEvent = { NSLog("Klodik: событие \(String(describing: $0.kind)) от сессии \($0.sessionId)") }
+        server.start()
 
         // Для замеров нагрузки: KLODIK_DEMO=<анимация> крутит её без остановки.
         if let name = ProcessInfo.processInfo.environment["KLODIK_DEMO"], let anim = PetAnimation(rawValue: name) {
