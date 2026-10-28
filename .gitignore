@@ -1,0 +1,5 @@
+.build/
+build/
+sandbox-hooks/
+.DS_Store
+.swiftpm/
