@@ -5,7 +5,7 @@
 #   bash scripts/build-app.sh --release  — universal (Apple Silicon + Intel) и build/Klodik-<версия>.zip для GitHub
 set -euo pipefail
 
-VERSION="0.2.0"
+VERSION="0.2.1"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/build/Klodik.app"
 
@@ -30,7 +30,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleExecutable</key>       <string>Klodik</string>
     <key>CFBundlePackageType</key>      <string>APPL</string>
     <key>CFBundleShortVersionString</key><string>__VERSION__</string>
-    <key>CFBundleVersion</key>          <string>3</string>
+    <key>CFBundleVersion</key>          <string>4</string>
     <key>LSMinimumSystemVersion</key>   <string>14.0</string>
     <key>LSUIElement</key>              <true/>
 </dict>
