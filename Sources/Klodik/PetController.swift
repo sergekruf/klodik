@@ -33,6 +33,9 @@ final class PetController: NSObject, NSMenuDelegate {
     private let bubble = Bubble()
     private let listModel = SessionListModel()
     private lazy var popover = makePopover()
+    private let detailTip = DetailTip()
+    /// Строка списка под курсором — для окошка «что просит».
+    private var hoveredId: String?
 
     private var hotKey: HotKey?
     private var nextSession = NextSession()
@@ -177,6 +180,7 @@ final class PetController: NSObject, NSMenuDelegate {
         listModel.snoozed = snoozedUntil != nil
         listModel.formatBroken = store.formatBroken
         listModel.daySummary = waitLog.summary(on: now)
+        if hoveredId != nil { showDetailTip() }
     }
 
     /// Новая серая — пузырь «ждёт ответа» и взмах, новая синяя — «готово» и радость.
@@ -425,7 +429,21 @@ final class PetController: NSObject, NSMenuDelegate {
         let host = NSHostingController(rootView: SessionListView(model: listModel))
         host.sizingOptions = [.preferredContentSize]
         popover.contentViewController = host
+        NotificationCenter.default.addObserver(forName: NSPopover.willCloseNotification, object: popover, queue: .main) { [weak self] _ in
+            self?.hoveredId = nil
+            self?.detailTip.hide()
+        }
         return popover
+    }
+
+    /// Окошко над списком с тем, что просит сессия под курсором. Без строки «что просит» — без окошка.
+    private func showDetailTip() {
+        guard popover.isShown, let id = hoveredId, let window = popover.contentViewController?.view.window,
+              let detail = listModel.items.first(where: { $0.localId == id })?.detail else {
+            detailTip.hide()
+            return
+        }
+        detailTip.show(detail, above: window.frame)
     }
 
     private func toggleList() {
@@ -467,6 +485,16 @@ final class PetController: NSObject, NSMenuDelegate {
         listModel.openUpdate = { [weak self] url in
             self?.popover.performClose(nil)
             NSWorkspace.shared.open(url)
+        }
+        listModel.hover = { [weak self] item, inside in
+            guard let self else { return }
+            // Переход между строками: «вошёл» в новую может прийти раньше, чем «вышел» из старой.
+            if inside {
+                hoveredId = item.localId
+            } else if hoveredId == item.localId {
+                hoveredId = nil
+            }
+            showDetailTip()
         }
     }
 

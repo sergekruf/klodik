@@ -86,9 +86,6 @@ if let i = CommandLine.arguments.firstIndex(of: "--login-item") {
     }
 }
 
-// Подсказка с полным «что просит» у строки списка: системная задержка около секунды, а тут её ждут глазами.
-UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 150])
-
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
