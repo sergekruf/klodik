@@ -217,6 +217,39 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(items().map(\.localId), ["local_1"])
     }
 
+    // MARK: «непрочитано» из Claude
+
+    func testClaudeUnreadMakesReadSessionBlue() {
+        // Открыта после конца хода (прочитана), но в Claude отмечена непрочитанной.
+        tracker.update(sessions: [session(1, focused: 5, edge: 30, status: .completed), session(2, focused: 5, edge: 30)])
+        XCTAssertNil(dot(1))
+        tracker.claudeUnread = ["local_1"]
+        XCTAssertEqual(dot(1), .blue)
+        XCTAssertEqual(items().first?.waitingSince, t(30))
+        XCTAssertNil(dot(2))
+        // Claude снял отметку (сессию открыли) — пропала.
+        tracker.claudeUnread = []
+        XCTAssertNil(dot(1))
+    }
+
+    func testClaudeUnreadKeepsGrayAndRemind() {
+        tracker.update(sessions: [session(1, focused: 30, edge: 20, status: .blocked), session(2, focused: 5, edge: 30)])
+        tracker.markRemind("local_2", at: t(3))
+        tracker.claudeUnread = ["local_1", "local_2"]
+        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(2), .remind)
+    }
+
+    func testClaudeUnreadIgnoresWindowAndHiddenButNotArchive() {
+        let week = 7 * 24 * 60.0
+        tracker.update(sessions: [session(1, focused: week + 50, edge: week + 100),
+                                  session(2, focused: 5, edge: 30),
+                                  session(3, focused: 5, edge: 30, archived: true)])
+        tracker.hide("local_2", at: t(10))
+        tracker.claudeUnread = ["local_1", "local_2", "local_3"]
+        XCTAssertEqual(Set(items().map(\.localId)), ["local_1", "local_2"])
+    }
+
     func testEventsFromSessionsWithoutFileAreIgnored() {
         tracker.update(sessions: [])
         tracker.handle(HookEvent(sessionId: "terminal", kind: .permissionRequest("Bash"), at: t(1)), claudeFrontmost: false)

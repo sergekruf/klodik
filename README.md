@@ -28,7 +28,7 @@ https://github.com/user-attachments/assets/baba8fa6-3eba-478a-84c3-d66fe0d9cad1
 - **Точки как в Claude.**
   - серая — Claude ждёт ответа: просит разрешение или задал вопрос;
   - серая пустая — вы её уже открывали, но не ответили;
-  - синяя — закончила работу, вы ещё не смотрели;
+  - синяя — закончила работу, вы ещё не смотрели или сами отметили её непрочитанной в Claude;
   - синяя с колокольчиком — ваша метка «Напомнить».
 - **Бейдж над головой.** Сколько сессий в списке. Красный, если хоть одна ждёт ответа.
 - **Напоминает и успокаивается.** Прыгает из-за свежих сессий, которые ждут ответа. Из-за остальных изредка машет. Пока Claude открыт на переднем плане, молчит.
@@ -132,7 +132,7 @@ bash scripts/build-app.sh --install
 
 Klodik is my unofficial desktop pet for the Code tab of the Claude app on macOS. I run about ten sessions in parallel and kept missing the one that asked for permission half an hour ago. Klodik knows about every session that needs me and keeps reminding me until I deal with them.
 
-- **Click the pet** to see sessions that wait for you: gray means Claude needs an answer, blue means a finished turn you haven't seen. Click a row to open exactly that session.
+- **Click the pet** to see sessions that wait for you: gray means Claude needs an answer, blue means a finished turn you haven't seen or a session you marked unread in Claude. Click a row to open exactly that session.
 - **See what each session asks for**: `Bash: npm run migrate`, a file name, the question text, or Claude's own turn summary.
 - **⌥⌘K** opens the session that has waited longest; press again for the next one.
 - **Reminders** grow from a jump per minute to one every 30 seconds (Gentle, Normal and Insistent levels). It stays quiet while Claude is in front.

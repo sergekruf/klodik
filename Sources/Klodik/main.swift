@@ -36,6 +36,11 @@ if CommandLine.arguments.contains("--sessions") {
     print("Неархивных с активностью за 7 дней: \(recent.count), из них с итогом blocked: \(recent.filter { $0.statusCategory == .blocked }.count)")
     let tracker = Tracker()
     tracker.update(sessions: Array(store.sessions.values))
+    let unreadStarted = Date()
+    let unread = ClaudeUnread().read()
+    let unreadMs = Int(Date().timeIntervalSince(unreadStarted) * 1000)
+    print("Отмечены непрочитанными в Claude: \(unread.map { "\($0.count)" } ?? "не читается"), чтение: \(unreadMs) мс")
+    tracker.claudeUnread = unread ?? []
     let items = tracker.items(now: Date())
     let gray = items.filter { $0.dot == .gray }
     print("Список Клодика: серых \(gray.count) (из них открывали \(gray.filter(\.openedSinceWaiting).count)), синих \(items.filter { $0.dot == .blue }.count)")

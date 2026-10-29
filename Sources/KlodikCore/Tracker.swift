@@ -44,6 +44,8 @@ public final class Tracker {
     public var config: Config
     /// Метки «напомнить»: `localId` → когда поставлена. Снимается сама, когда сессию открыли после метки.
     public private(set) var remind: [String: Date] = [:]
+    /// Отмеченные непрочитанными в самом Claude (`ClaudeUnread`). Снимает их Claude, когда сессию откроют.
+    public var claudeUnread: Set<String> = []
     /// «Скрыть до следующей активности»: `localId` → когда скрыта.
     public private(set) var hidden: [String: Date] = [:]
     /// Метки поменялись — их пора сохранить.
@@ -168,12 +170,15 @@ public final class Tracker {
         var result: [TrackedItem] = []
         for s in sessions.values where !s.isArchived {
             let mark = remind[s.localId]
+            let unreadInClaude = claudeUnread.contains(s.localId)
             let lastSeen = max(s.lastActivityAt ?? .distantPast, s.cliSessionId.flatMap { lastEventAt[$0] } ?? .distantPast)
-            guard lastSeen > windowStart || mark != nil else { continue }
-            if let hiddenAt = hidden[s.localId], lastSignal(s) <= hiddenAt { continue }
+            guard lastSeen > windowStart || mark != nil || unreadInClaude else { continue }
+            if !unreadInClaude, let hiddenAt = hidden[s.localId], lastSignal(s) <= hiddenAt { continue }
 
             var state = needState(s, now: now)
             if let mark, state?.dot != .gray { state = (.remind, mark) }
+            // Отметили непрочитанной в Claude — синяя, как у Claude в боковой панели. Время — конец последнего хода.
+            if unreadInClaude, state == nil, let edge = s.lastTurnEdgeAt ?? s.lastActivityAt { state = (.blue, edge) }
             guard let (dot, since) = state else { continue }
 
             result.append(TrackedItem(localId: s.localId, cliSessionId: s.cliSessionId, title: s.title,

@@ -19,6 +19,7 @@ final class PetController: NSObject, NSMenuDelegate {
     private var animator: Animator!
 
     private let store = SessionStore()
+    private let claudeUnread = ClaudeUnread()
     private var server: EventServer?
     /// Сколько соседних портов уже перепробовали, если основной занят.
     private var portAttempts = 0
@@ -36,6 +37,7 @@ final class PetController: NSObject, NSMenuDelegate {
     private var nextSession = NextSession()
     private var snoozedUntil: Date?
     private var lastActivityAt = Date()
+    private var claudeUnreadWarned = false
     /// Точки на прошлом пересчёте — чтобы заметить новое событие. nil до первого пересчёта:
     /// при запуске Клодик не объявляет о том, что и так уже было.
     private var previousDots: [String: TrackedItem.Dot]?
@@ -75,6 +77,9 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         store.loadAll()
         store.startWatching()
+        claudeUnread.onChange = { [weak self] in self?.reloadClaudeUnread() }
+        reloadClaudeUnread()
+        claudeUnread.startWatching()
         if front.isClaudeFrontmost { tracker.markOnScreenRead(at: Date()) }
 
         startServer(port: state.port)
@@ -111,6 +116,19 @@ final class PetController: NSObject, NSMenuDelegate {
                 self?.toggleList()
             }
         }
+    }
+
+    /// Пометки «непрочитано» из Claude. Не читается (формат поменялся) — работаем без них.
+    private func reloadClaudeUnread() {
+        let ids = claudeUnread.read()
+        if ids == nil, !tracker.claudeUnread.isEmpty || !claudeUnreadWarned {
+            NSLog("Klodik: пометки «непрочитано» из Claude не читаются, работаю без них")
+            claudeUnreadWarned = true
+        }
+        let next = ids ?? []
+        guard next != tracker.claudeUnread else { return }
+        tracker.claudeUnread = next
+        scheduleRefresh()
     }
 
     // MARK: - Пересчёт
