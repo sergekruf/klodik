@@ -444,12 +444,12 @@ final class PetController: NSObject, NSMenuDelegate {
             detailTip.hide()
             return
         }
-        // `.global` у SwiftUI считается от корня окна сверху вниз; вид хостинга перевёрнут так же.
+        // Рамка считается от верха списка вниз; вид хостинга перевёрнут так же.
         var row = window.convertToScreen(view.convert(hoveredFrame, to: nil))
         // Рамка не сошлась с курсором (прокрутка ещё не обновила её) — ставим напротив курсора.
         let mouse = NSEvent.mouseLocation
         if mouse.y < row.minY - 2 || mouse.y > row.maxY + 2 {
-            row = NSRect(x: row.minX, y: mouse.y - 20, width: row.width, height: 40)
+            row = NSRect(x: row.minX, y: mouse.y - 22, width: row.width, height: 44)
         }
         detailTip.show(detail, beside: row, list: window.frame)
     }

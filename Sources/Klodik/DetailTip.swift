@@ -27,7 +27,7 @@ final class DetailTip {
         panel.contentView = box
     }
 
-    /// Показать слева от списка `list` напротив строки `row` (справа, если слева не помещается). Всё в координатах экрана.
+    /// Показать слева от списка `list` вровень с верхом строки `row` (справа, если слева не помещается). Всё в координатах экрана.
     func show(_ text: String, beside row: NSRect, list: NSRect) {
         let width: CGFloat = 280
         label.stringValue = text
@@ -37,7 +37,7 @@ final class DetailTip {
         label.frame = NSRect(x: Self.padding, y: Self.padding, width: width - 2 * Self.padding, height: textSize.height)
 
         let screen = NSScreen.screens.first { $0.frame.intersects(list) }?.visibleFrame ?? list
-        var origin = NSPoint(x: list.minX - size.width - 6, y: row.midY - size.height / 2)
+        var origin = NSPoint(x: list.minX - size.width - 6, y: row.maxY - size.height)
         if origin.x < screen.minX + 4 { origin.x = list.maxX + 6 }
         origin.y = min(max(origin.y, screen.minY + 4), screen.maxY - size.height - 4)
         panel.setFrame(NSRect(origin: origin, size: size), display: true)

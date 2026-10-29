@@ -25,7 +25,7 @@ final class SessionListModel: ObservableObject {
     var quit: () -> Void = {}
     var openUpdate: (URL) -> Void = { _ in }
     /// Курсор вошёл в строку (`true`) или вышел из неё: показать или убрать окошко «что просит».
-    /// Рамка строки — в координатах окна списка (SwiftUI `.global`, начало сверху слева).
+    /// Рамка строки — от верхнего левого угла всего списка (он заполняет вид хостинга целиком).
     var hover: (TrackedItem, Bool, CGRect) -> Void = { _, _, _ in }
 }
 
@@ -115,6 +115,7 @@ struct SessionListView: View {
             .padding(.vertical, 8)
         }
         .frame(width: 340)
+        .coordinateSpace(name: SessionRow.listSpace)
     }
 }
 
@@ -138,6 +139,7 @@ private struct SessionRow: View {
     let onHover: (Bool, CGRect) -> Void
     @State private var hovered = false
     @State private var frame = CGRect.zero
+    static let listSpace = "list"
 
     var body: some View {
         HStack(spacing: 10) {
@@ -161,8 +163,8 @@ private struct SessionRow: View {
         .contentShape(Rectangle())
         .background(GeometryReader { geometry in
             Color.clear
-                .onAppear { frame = geometry.frame(in: .global) }
-                .onChange(of: geometry.frame(in: .global)) { frame = $1 }
+                .onAppear { frame = geometry.frame(in: .named(Self.listSpace)) }
+                .onChange(of: geometry.frame(in: .named(Self.listSpace))) { frame = $1 }
         })
         .onHover { inside in
             hovered = inside
