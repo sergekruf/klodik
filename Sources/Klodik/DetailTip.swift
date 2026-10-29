@@ -1,6 +1,6 @@
 import AppKit
 
-/// Окошко над списком сессий: что просит сессия под курсором. Появляется сразу, без системной задержки подсказок.
+/// Окошко сбоку от списка сессий напротив строки под курсором: что эта сессия просит. Появляется сразу, без системной задержки подсказок.
 final class DetailTip {
     private let panel: NSPanel
     private let label = NSTextField(wrappingLabelWithString: "")
@@ -27,19 +27,19 @@ final class DetailTip {
         panel.contentView = box
     }
 
-    /// Показать над окном `anchor` той же ширины (или под ним, если сверху нет места).
-    func show(_ text: String, above anchor: NSRect) {
-        let width = max(anchor.width - 16, 200)
+    /// Показать слева от списка `list` напротив строки `row` (справа, если слева не помещается). Всё в координатах экрана.
+    func show(_ text: String, beside row: NSRect, list: NSRect) {
+        let width: CGFloat = 280
         label.stringValue = text
         label.preferredMaxLayoutWidth = width - 2 * Self.padding
         let textSize = label.fittingSize
         let size = NSSize(width: width, height: textSize.height + 2 * Self.padding)
         label.frame = NSRect(x: Self.padding, y: Self.padding, width: width - 2 * Self.padding, height: textSize.height)
 
-        let screen = NSScreen.screens.first { $0.frame.intersects(anchor) }?.visibleFrame ?? anchor
-        var origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.maxY + 6)
-        if origin.y + size.height > screen.maxY { origin.y = anchor.minY - size.height - 6 }
-        origin.x = min(max(origin.x, screen.minX + 4), screen.maxX - size.width - 4)
+        let screen = NSScreen.screens.first { $0.frame.intersects(list) }?.visibleFrame ?? list
+        var origin = NSPoint(x: list.minX - size.width - 6, y: row.midY - size.height / 2)
+        if origin.x < screen.minX + 4 { origin.x = list.maxX + 6 }
+        origin.y = min(max(origin.y, screen.minY + 4), screen.maxY - size.height - 4)
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
         panel.orderFrontRegardless()
     }

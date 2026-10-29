@@ -34,8 +34,9 @@ final class PetController: NSObject, NSMenuDelegate {
     private let listModel = SessionListModel()
     private lazy var popover = makePopover()
     private let detailTip = DetailTip()
-    /// Строка списка под курсором — для окошка «что просит».
+    /// Строка списка под курсором и её рамка в окне списка — для окошка «что просит».
     private var hoveredId: String?
+    private var hoveredFrame = CGRect.zero
 
     private var hotKey: HotKey?
     private var nextSession = NextSession()
@@ -436,14 +437,21 @@ final class PetController: NSObject, NSMenuDelegate {
         return popover
     }
 
-    /// Окошко над списком с тем, что просит сессия под курсором. Без строки «что просит» — без окошка.
+    /// Окошко слева от списка напротив сессии под курсором. Без строки «что просит» — без окошка.
     private func showDetailTip() {
-        guard popover.isShown, let id = hoveredId, let window = popover.contentViewController?.view.window,
+        guard popover.isShown, let id = hoveredId, let view = popover.contentViewController?.view, let window = view.window,
               let detail = listModel.items.first(where: { $0.localId == id })?.detail else {
             detailTip.hide()
             return
         }
-        detailTip.show(detail, above: window.frame)
+        // `.global` у SwiftUI считается от корня окна сверху вниз; вид хостинга перевёрнут так же.
+        var row = window.convertToScreen(view.convert(hoveredFrame, to: nil))
+        // Рамка не сошлась с курсором (прокрутка ещё не обновила её) — ставим напротив курсора.
+        let mouse = NSEvent.mouseLocation
+        if mouse.y < row.minY - 2 || mouse.y > row.maxY + 2 {
+            row = NSRect(x: row.minX, y: mouse.y - 20, width: row.width, height: 40)
+        }
+        detailTip.show(detail, beside: row, list: window.frame)
     }
 
     private func toggleList() {
@@ -486,11 +494,12 @@ final class PetController: NSObject, NSMenuDelegate {
             self?.popover.performClose(nil)
             NSWorkspace.shared.open(url)
         }
-        listModel.hover = { [weak self] item, inside in
+        listModel.hover = { [weak self] item, inside, frame in
             guard let self else { return }
             // Переход между строками: «вошёл» в новую может прийти раньше, чем «вышел» из старой.
             if inside {
                 hoveredId = item.localId
+                hoveredFrame = frame
             } else if hoveredId == item.localId {
                 hoveredId = nil
             }

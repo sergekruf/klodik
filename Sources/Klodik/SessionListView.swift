@@ -25,7 +25,8 @@ final class SessionListModel: ObservableObject {
     var quit: () -> Void = {}
     var openUpdate: (URL) -> Void = { _ in }
     /// Курсор вошёл в строку (`true`) или вышел из неё: показать или убрать окошко «что просит».
-    var hover: (TrackedItem, Bool) -> Void = { _, _ in }
+    /// Рамка строки — в координатах окна списка (SwiftUI `.global`, начало сверху слева).
+    var hover: (TrackedItem, Bool, CGRect) -> Void = { _, _, _ in }
 }
 
 struct SessionListView: View {
@@ -43,7 +44,7 @@ struct SessionListView: View {
                     VStack(spacing: 2) {
                         ForEach(model.items, id: \.localId) { item in
                             SessionRow(item: item, reminded: model.remindIds.contains(item.localId), now: model.now,
-                                       onHover: { model.hover(item, $0) })
+                                       onHover: { model.hover(item, $0, $1) })
                                 .onTapGesture { model.open(item) }
                                 .contextMenu {
                                     Button(model.remindIds.contains(item.localId) ? tr("Не напоминать", "Don't remind me") : tr("Напомнить", "Remind me")) {
@@ -134,8 +135,9 @@ private struct SessionRow: View {
     let item: TrackedItem
     let reminded: Bool
     let now: Date
-    let onHover: (Bool) -> Void
+    let onHover: (Bool, CGRect) -> Void
     @State private var hovered = false
+    @State private var frame = CGRect.zero
 
     var body: some View {
         HStack(spacing: 10) {
@@ -157,9 +159,14 @@ private struct SessionRow: View {
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 6).fill(hovered ? Color.primary.opacity(0.08) : .clear))
         .contentShape(Rectangle())
+        .background(GeometryReader { geometry in
+            Color.clear
+                .onAppear { frame = geometry.frame(in: .global) }
+                .onChange(of: geometry.frame(in: .global)) { frame = $1 }
+        })
         .onHover { inside in
             hovered = inside
-            onHover(inside)
+            onHover(inside, frame)
         }
     }
 }
