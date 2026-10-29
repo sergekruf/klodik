@@ -207,12 +207,12 @@ final class PetController: NSObject, NSMenuDelegate {
 
         if let item = items.first(where: { $0.dot == .waiting && previous[$0.localId] != .waiting }) {
             bubble.show(.init(label: tr("Ждёт ответа", "Waiting for you"), labelColor: .orange, title: item.title,
-                              text: bubbleText(item)), above: petOnScreen)
+                              text: bubbleText(item)), above: petOnScreen, onClick: { Self.openInClaude(item) })
             bubbleItemId = item.localId
             animator.playOnce(.wave)
         } else if let item = items.first(where: { $0.dot == .blue && previous[$0.localId] == nil }) {
             bubble.show(.init(label: tr("Готово", "Done"), labelColor: .blue, title: item.title,
-                              text: bubbleText(item)), above: petOnScreen)
+                              text: bubbleText(item)), above: petOnScreen, onClick: { Self.openInClaude(item) })
             bubbleItemId = item.localId
             animator.playOnce(.happy)
         } else if bubble.isShown, let id = bubbleItemId, let item = items.first(where: { $0.localId == id }) {

@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Пузырь как в комиксах над Клодиком: белое облачко с обводкой и хвостиком к нему. Висит дольше, чем длиннее текст.
+/// Пузырь как в комиксах над Клодиком: белое облачко с обводкой и хвостиком к нему. Висит дольше, чем длиннее текст,
+/// и не пропадает, пока на нём курсор. Клик по нему — действие показа (открыть сессию) и пузырь уходит.
 final class Bubble {
     struct Content {
         /// Маленькая цветная строка сверху: «Готово», «Ждёт ответа». nil — без неё.
@@ -20,6 +21,8 @@ final class Bubble {
     private var content = Content(title: "")
     private var shownAt = Date.distantPast
     private var seconds: TimeInterval = 0
+    private var hovered = false
+    private var onClick: (() -> Void)?
 
     init() {
         panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
@@ -28,8 +31,18 @@ final class Bubble {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false   // тень рисует сам пузырь, плотную, как в комиксе
-        panel.ignoresMouseEvents = true
-        panel.contentView = host
+        panel.hidesOnDeactivate = false   // у панели по умолчанию прячется, как только Клодик уходит на задний план
+        let container = MouseView()
+        host.autoresizingMask = [.width, .height]
+        container.addSubview(host)
+        container.onEnter = { [weak self] in self?.mouseEntered() }
+        container.onExit = { [weak self] in self?.mouseExited() }
+        container.onClick = { [weak self] in
+            let action = self?.onClick
+            self?.hide()
+            action?()
+        }
+        panel.contentView = container
     }
 
     var isShown: Bool { panel.isVisible }
@@ -39,10 +52,11 @@ final class Bubble {
         show(Content(title: text), above: anchor, for: seconds)
     }
 
-    /// Показать над окном `anchor` (или под ним, если сверху нет места). Без `seconds` — от 6 до 15 секунд по длине текста.
-    func show(_ content: Content, above anchor: NSRect, for seconds: TimeInterval? = nil) {
+    /// Показать над окном `anchor` (или под ним, если сверху нет места). Без `seconds` — от 10 до 20 секунд по длине текста.
+    func show(_ content: Content, above anchor: NSRect, for seconds: TimeInterval? = nil, onClick: (() -> Void)? = nil) {
         self.anchor = anchor
         self.content = content
+        self.onClick = onClick
         shownAt = Date()
         self.seconds = seconds ?? Self.readingTime(content)
         let frame = layout()
@@ -71,12 +85,25 @@ final class Bubble {
 
     func hide() {
         hideWork?.cancel()
+        hovered = false
         panel.orderOut(nil)
     }
 
     private static func readingTime(_ content: Content) -> TimeInterval {
         let characters = content.title.count + (content.text?.count ?? 0)
-        return min(15, max(6, Double(characters) * 0.08))
+        return min(20, max(10, Double(characters) * 0.1))
+    }
+
+    /// Курсор на пузыре — читают: не прятать, а если уже гаснет, вернуть.
+    private func mouseEntered() {
+        hovered = true
+        hideWork?.cancel()
+        panel.animator().alphaValue = 1
+    }
+
+    private func mouseExited() {
+        hovered = false
+        scheduleHide(after: 3)
     }
 
     /// Нарисовать содержимое и вернуть, где должно стоять окно.
@@ -110,7 +137,7 @@ final class Bubble {
     private func scheduleHide(after seconds: TimeInterval) {
         hideWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
+            guard let self, !hovered else { return }
             NSAnimationContext.runAnimationGroup({ context in
                 context.duration = 0.3
                 self.panel.animator().alphaValue = 0
@@ -201,4 +228,25 @@ private struct SpeechBubble: Shape {
         p.closeSubpath()
         return p
     }
+}
+
+/// Подложка пузыря: курсор и клик ловятся, даже когда Клодик не активное приложение (а он почти всегда такой).
+private final class MouseView: NSView {
+    var onEnter: () -> Void = {}
+    var onExit: () -> Void = {}
+    var onClick: () -> Void = {}
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseEntered(with event: NSEvent) { onEnter() }
+    override func mouseExited(with event: NSEvent) { onExit() }
+    override func mouseDown(with event: NSEvent) { onClick() }
+    // Клик должен дойти до подложки, а не до SwiftUI внутри.
+    override func hitTest(_ point: NSPoint) -> NSView? { frame.contains(point) ? self : nil }
 }

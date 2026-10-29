@@ -17,6 +17,7 @@ final class DetailTip {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.ignoresMouseEvents = true
+        panel.hidesOnDeactivate = false
         panel.contentView = host
     }
 
