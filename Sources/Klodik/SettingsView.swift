@@ -24,6 +24,8 @@ final class SettingsModel: ObservableObject {
     @Published var hooksInstalled = false
     /// Английские итоги ходов можно переводить, но языки перевода ещё не скачаны.
     @Published var translationNeedsDownload = false
+    /// Скачивание уже попросили: macOS качает в фоне и может долго тянуть.
+    @Published var translationRequested = false
     var translationLanguages = (source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "ru"))
 
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
@@ -141,13 +143,29 @@ private struct TranslationDownloadRow: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button(tr("Скачать", "Download")) {
-                configuration = .init(source: model.translationLanguages.source, target: model.translationLanguages.target)
+            if model.translationRequested {
+                ProgressView().controlSize(.small)
+            } else {
+                Button(tr("Скачать", "Download")) {
+                    configuration = .init(source: model.translationLanguages.source, target: model.translationLanguages.target)
+                }
             }
         }
         .translationTask(configuration) { session in
             try? await session.prepareTranslation()
             await MainActor.run { model.translationPrepared() }
+        }
+        if model.translationRequested {
+            HStack {
+                Text(tr("macOS качает языки в фоне и может отложить загрузку. Быстрее скачать в «Язык и регион» → «Языки перевода»",
+                         "macOS downloads languages in the background and may postpone it. Faster: Language & Region → Translation Languages"))
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button(tr("Открыть", "Open")) {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!)
+                }
+                .font(.caption)
+            }
         }
     }
 }

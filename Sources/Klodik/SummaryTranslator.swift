@@ -21,6 +21,10 @@ final class SummaryTranslator {
     private var queue: [String] = []
     private var running = false
 
+    /// Пока языки не скачаны, статус проверяется раз в минуту: macOS качает их в фоне, когда сочтёт удобным,
+    /// а можно скачать и в системных настройках. Перевод включится сам.
+    private var pollTimer: Timer?
+
     func checkStatus() {
         guard #available(macOS 26, *) else { return }
         Task { @MainActor in
@@ -29,6 +33,10 @@ final class SummaryTranslator {
             case .supported: .needsDownload
             default: .unavailable
             }
+            pollTimer?.invalidate()
+            pollTimer = status == .needsDownload
+                ? Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { [weak self] _ in self?.checkStatus() }
+                : nil
             guard status != self.status else { return }
             self.status = status
             onChange?()

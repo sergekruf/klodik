@@ -327,7 +327,10 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         settingsModel.toggleHooks = { [weak self] in self?.toggleHooks() }
         settingsModel.translationLanguages = (translator.source, translator.target)
-        settingsModel.translationPrepared = { [weak self] in self?.translator.checkStatus() }
+        settingsModel.translationPrepared = { [weak self] in
+            self?.settingsModel.translationRequested = true
+            self?.translator.checkStatus()
+        }
 
         let host = NSHostingController(rootView: SettingsView(model: settingsModel))
         host.sizingOptions = [.preferredContentSize]
