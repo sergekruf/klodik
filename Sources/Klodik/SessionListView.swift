@@ -6,7 +6,8 @@ final class SessionListModel: ObservableObject {
     @Published var items: [TrackedItem] = []
     @Published var remindIds: Set<String> = []
     @Published var now = Date()
-    @Published var snoozed = false
+    /// До какого времени Клодик молчит. nil — не отложено.
+    @Published var snoozedUntil: Date?
     @Published var formatBroken = false
     @Published var hooksInstalled = true
     /// Приёмник событий не запустился — текст для пользователя.
@@ -29,6 +30,7 @@ final class SessionListModel: ObservableObject {
     var hide: (TrackedItem) -> Void = { _ in }
     var installHooks: () -> Void = {}
     var toggleSnooze: () -> Void = {}
+    var snoozeUntilMorning: () -> Void = {}
     var openSettings: () -> Void = {}
     var quit: () -> Void = {}
     var openUpdate: (URL) -> Void = { _ in }
@@ -127,7 +129,21 @@ struct SessionListView: View {
 
             Divider()
             HStack {
-                Button(model.snoozed ? tr("Не откладывать", "Resume reminders") : tr("Отложить на 30 минут", "Snooze for 30 minutes")) { model.toggleSnooze() }
+                if let until = model.snoozedUntil {
+                    Button(tr("Не откладывать (до \(until.formatted(date: .omitted, time: .shortened)))",
+                              "Resume reminders (snoozed till \(until.formatted(date: .omitted, time: .shortened)))")) { model.toggleSnooze() }
+                } else {
+                    Menu {
+                        Button(tr("На 30 минут", "For 30 minutes")) { model.toggleSnooze() }
+                        Button(tr("До утра, до 9:00", "Until 9:00 in the morning")) { model.snoozeUntilMorning() }
+                    } label: {
+                        Text(tr("Отложить…", "Snooze…")).font(.callout)
+                    }
+                    .menuStyle(.button)
+                    .menuIndicator(.hidden)
+                    .buttonStyle(.borderless)
+                    .fixedSize()
+                }
                 Spacer()
                 Button(tr("Настройки", "Settings")) { model.openSettings() }
                 Button(tr("Выйти", "Quit")) { model.quit() }
@@ -224,7 +240,7 @@ private struct SessionRow: View {
             }
             Text(WaitTime.short(now.timeIntervalSince(item.waitingSince)))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ageColor)
                 .monospacedDigit()
         }
         .padding(.horizontal, 8)
@@ -239,6 +255,16 @@ private struct SessionRow: View {
         .onHover { inside in
             hovered = inside
             onHover(inside, frame)
+        }
+    }
+
+    /// Застрявшее решение видно сразу: ждёт ответа дольше суток — оранжевое время, дольше трёх дней — красное.
+    private var ageColor: Color {
+        guard item.dot == .waiting else { return .secondary }
+        switch WaitTime.age(now.timeIntervalSince(item.waitingSince)) {
+        case .fresh: return .secondary
+        case .day: return .orange
+        case .days: return .red
         }
     }
 }

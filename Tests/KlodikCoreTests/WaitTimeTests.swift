@@ -35,4 +35,23 @@ final class WaitTimeTests: XCTestCase {
         XCTAssertEqual(WaitTime.duration(80 * 60), "1 h 20 min")
         XCTAssertEqual(ReminderScale.normal.title, "Normal")
     }
+
+    func testAgeSteps() {
+        XCTAssertEqual(WaitTime.age(23 * 3600), .fresh)
+        XCTAssertEqual(WaitTime.age(25 * 3600), .day)
+        XCTAssertEqual(WaitTime.age(71 * 3600), .day)
+        XCTAssertEqual(WaitTime.age(73 * 3600), .days)
+    }
+
+    func testNextMorning() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Yekaterinburg")!
+        func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
+        }
+        XCTAssertEqual(WaitTime.nextMorning(after: at(30, 23), calendar: calendar), at(31, 9))
+        XCTAssertEqual(WaitTime.nextMorning(after: at(30, 2), calendar: calendar), at(30, 9))     // ночью — до сегодняшнего утра
+        XCTAssertEqual(WaitTime.nextMorning(after: at(30, 9), calendar: calendar), at(31, 9))
+        XCTAssertEqual(WaitTime.nextMorning(after: at(30, 8, 59), calendar: calendar), at(30, 9))
+    }
 }

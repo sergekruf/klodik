@@ -212,7 +212,7 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         listModel.remindIds = Set(tracker.remind.keys)
         listModel.now = now
-        listModel.snoozed = snoozedUntil != nil
+        listModel.snoozedUntil = snoozedUntil
         listModel.formatBroken = store.formatBroken
         listModel.daySummary = waitLog.summary(on: now)
         if hoveredId != nil { showDetailTip() }
@@ -541,6 +541,7 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         listModel.installHooks = { [weak self] in self?.installHooks() }
         listModel.toggleSnooze = { [weak self] in self?.toggleSnooze() }
+        listModel.snoozeUntilMorning = { [weak self] in self?.snoozeUntilMorning() }
         listModel.openSettings = { [weak self] in
             self?.popover.performClose(nil)
             self?.openSettings()
@@ -576,6 +577,12 @@ final class PetController: NSObject, NSMenuDelegate {
         refresh()
     }
 
+    /// Тишина до 9 утра: вечером — до завтрашнего, ночью — до сегодняшнего.
+    @objc private func snoozeUntilMorning() {
+        snoozedUntil = WaitTime.nextMorning(after: Date())
+        refresh()
+    }
+
     // MARK: - Меню по правому клику
 
     private func makeMenu() -> NSMenu {
@@ -584,6 +591,9 @@ final class PetController: NSObject, NSMenuDelegate {
         let snooze = menu.addItem(withTitle: "", action: #selector(toggleSnooze), keyEquivalent: "")
         snooze.target = self
         snooze.tag = 1
+        let morning = menu.addItem(withTitle: tr("Отложить до утра", "Snooze until morning"), action: #selector(snoozeUntilMorning), keyEquivalent: "")
+        morning.target = self
+        morning.tag = 3
         let hooks = menu.addItem(withTitle: "", action: #selector(toggleHooks), keyEquivalent: "")
         hooks.target = self
         hooks.tag = 2
@@ -595,6 +605,7 @@ final class PetController: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTag: 1)?.title = snoozedUntil == nil ? tr("Отложить на 30 минут", "Snooze for 30 minutes") : tr("Не откладывать", "Resume reminders")
+        menu.item(withTag: 3)?.isHidden = snoozedUntil != nil
         refreshHooksState()
         menu.item(withTag: 2)?.title = listModel.hooksInstalled ? tr("Отключить от Claude Code", "Disconnect from Claude Code") : tr("Подключить к Claude Code", "Connect to Claude Code")
     }

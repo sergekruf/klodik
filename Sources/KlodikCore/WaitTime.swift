@@ -11,6 +11,31 @@ public enum WaitTime {
         }
     }
 
+    /// Насколько застряла сессия, которая ждёт ответа: время в списке красится, чтобы долгие решения было видно сразу.
+    public enum Age: Equatable {
+        case fresh
+        /// Ждёт дольше суток — оранжевое.
+        case day
+        /// Дольше трёх дней — красное.
+        case days
+    }
+
+    public static func age(_ seconds: TimeInterval) -> Age {
+        switch seconds {
+        case ..<(24 * 3600): .fresh
+        case ..<(3 * 24 * 3600): .day
+        default: .days
+        }
+    }
+
+    /// «Отложить до утра»: до ближайших 9:00. Ночью после полуночи — до сегодняшних, вечером — до завтрашних.
+    public static let morningHour = 9
+
+    public static func nextMorning(after now: Date, calendar: Calendar = .current) -> Date {
+        let today = calendar.date(bySettingHour: morningHour, minute: 0, second: 0, of: now)!
+        return today > now ? today : calendar.date(byAdding: .day, value: 1, to: today)!
+    }
+
     /// «меньше минуты», «4 мин», «1 ч 20 мин», «2 дн» — длительность для сводки за день.
     public static func duration(_ seconds: TimeInterval) -> String {
         switch seconds {
