@@ -20,13 +20,18 @@ public struct SessionInfo: Equatable {
     public var lastActivityAt: Date?
     public var statusCategory: StatusCategory?
     public var statusDetail: String?
+    /// Итог относится к последнему ответу Claude. Сразу после конца хода в файле ещё итог прошлого:
+    /// приложение пишет новый через несколько секунд.
+    public var summaryIsCurrent: Bool
 
     public init(localId: String, cliSessionId: String? = nil, title: String, projectName: String,
                 isArchived: Bool = false, lastFocusedAt: Date? = nil, lastTurnEdgeAt: Date? = nil,
-                lastActivityAt: Date? = nil, statusCategory: StatusCategory? = nil, statusDetail: String? = nil) {
+                lastActivityAt: Date? = nil, statusCategory: StatusCategory? = nil, statusDetail: String? = nil,
+                summaryIsCurrent: Bool = true) {
         self.localId = localId; self.cliSessionId = cliSessionId; self.title = title; self.projectName = projectName
         self.isArchived = isArchived; self.lastFocusedAt = lastFocusedAt; self.lastTurnEdgeAt = lastTurnEdgeAt
         self.lastActivityAt = lastActivityAt; self.statusCategory = statusCategory; self.statusDetail = statusDetail
+        self.summaryIsCurrent = summaryIsCurrent
     }
 }
 
@@ -51,7 +56,9 @@ public enum SessionFile {
                            lastTurnEdgeAt: date(raw.lastTurnEdgeAt),
                            lastActivityAt: date(raw.lastActivityAt),
                            statusCategory: raw.postTurnSummary?.status_category.map(category),
-                           statusDetail: raw.postTurnSummary?.status_detail)
+                           statusDetail: raw.postTurnSummary?.status_detail,
+                           summaryIsCurrent: raw.postTurnSummaryFor == nil || raw.lastAssistantUuid == nil
+                               || raw.postTurnSummaryFor == raw.lastAssistantUuid)
     }
 
     private static func date(_ ms: Double?) -> Date? {
@@ -78,6 +85,8 @@ public enum SessionFile {
         var lastTurnEdgeAt: Double?
         var lastActivityAt: Double?
         var postTurnSummary: Summary?
+        var postTurnSummaryFor: String?
+        var lastAssistantUuid: String?
 
         struct Summary: Decodable {
             var status_category: String?

@@ -14,6 +14,26 @@ public enum HookKind: Equatable {
     case sessionEnd
 }
 
+/// Вопрос Claude с вариантами ответа (инструмент AskUserQuestion). Клодик только показывает его, отвечают в Claude.
+public struct AskedQuestion: Equatable {
+    public struct Option: Equatable {
+        public var label: String
+        public var description: String?
+
+        public init(label: String, description: String? = nil) {
+            self.label = label; self.description = description
+        }
+    }
+
+    public var text: String
+    public var options: [Option]
+    public var multiSelect: Bool
+
+    public init(text: String, options: [Option], multiSelect: Bool = false) {
+        self.text = text; self.options = options; self.multiSelect = multiSelect
+    }
+}
+
 public struct HookEvent: Equatable {
     /// Совпадает с `cliSessionId` в файле сессии приложения.
     public var sessionId: String
@@ -21,11 +41,15 @@ public struct HookEvent: Equatable {
     public var cwd: String?
     /// Что именно просит или спрашивает Claude, коротко: «Bash: npm run build», «Edit: Tracker.swift», текст вопроса.
     public var detail: String?
+    /// Вопросы с вариантами, если это AskUserQuestion. Пусто у остальных инструментов.
+    public var questions: [AskedQuestion]
     /// Когда событие пришло к Клодику.
     public var at: Date
 
-    public init(sessionId: String, kind: HookKind, cwd: String? = nil, detail: String? = nil, at: Date) {
-        self.sessionId = sessionId; self.kind = kind; self.cwd = cwd; self.detail = detail; self.at = at
+    public init(sessionId: String, kind: HookKind, cwd: String? = nil, detail: String? = nil,
+                questions: [AskedQuestion] = [], at: Date) {
+        self.sessionId = sessionId; self.kind = kind; self.cwd = cwd; self.detail = detail
+        self.questions = questions; self.at = at
     }
 
     /// Неизвестные события, битый JSON и события без `session_id` — nil.
@@ -45,16 +69,33 @@ public struct HookEvent: Equatable {
         default: return nil
         }
         var detail: String?
+        var questions: [AskedQuestion] = []
         switch kind {
         case .preTool, .permissionRequest:
             let input = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["tool_input"] as? [String: Any]
             detail = toolSummary(raw.tool_name, input ?? [:])
+            if raw.tool_name == "AskUserQuestion" { questions = askedQuestions(input ?? [:]) }
         case .notification:
             detail = raw.message
         default:
             break
         }
-        return HookEvent(sessionId: raw.session_id, kind: kind, cwd: raw.cwd, detail: detail.flatMap(clipped), at: at)
+        return HookEvent(sessionId: raw.session_id, kind: kind, cwd: raw.cwd, detail: detail.flatMap(clipped),
+                         questions: questions, at: at)
+    }
+
+    /// `{"questions": [{"question": …, "multiSelect": …, "options": [{"label": …, "description": …}]}]}`.
+    /// Вопрос без текста или вариант без подписи пропускаем, а не ломаем весь список.
+    static func askedQuestions(_ input: [String: Any]) -> [AskedQuestion] {
+        (input["questions"] as? [[String: Any]] ?? []).compactMap { q in
+            guard let text = q["question"] as? String, !text.isEmpty else { return nil }
+            let options = (q["options"] as? [[String: Any]] ?? []).compactMap { o -> AskedQuestion.Option? in
+                guard let label = o["label"] as? String, !label.isEmpty else { return nil }
+                let description = (o["description"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                return AskedQuestion.Option(label: label, description: description)
+            }
+            return AskedQuestion(text: text, options: options, multiSelect: q["multiSelect"] as? Bool ?? false)
+        }
     }
 
     /// Самое говорящее поле инструмента. Вопрос AskUserQuestion — без имени инструмента, остальное — «Инструмент: что».

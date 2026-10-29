@@ -335,6 +335,29 @@ final class TrackerTests: XCTestCase {
         XCTAssertEqual(items().map(\.detailIsSummary), [true, true])
     }
 
+    func testQuestionOptionsLiveWhileWaiting() {
+        let question = AskedQuestion(text: "CSV или Google Sheets?", options: [.init(label: "CSV"), .init(label: "Sheets")])
+        tracker.update(sessions: [session(1, focused: 30, edge: 20)])
+        tracker.handle(HookEvent(sessionId: "cli_1", kind: .preTool("AskUserQuestion"), detail: question.text, questions: [question], at: t(3)),
+                       claudeFrontmost: false)
+        tracker.handle(event(1, .notification("elicitation_dialog"), 2), claudeFrontmost: false)
+        XCTAssertEqual(items().first?.questions, [question])
+        // Ответили — вопросов больше нет; следующий инструмент без вопроса их не вернёт.
+        tracker.handle(event(1, .postTool("AskUserQuestion"), 1), claudeFrontmost: false)
+        tracker.handle(event(1, .preTool("Bash"), 1), claudeFrontmost: false)
+        tracker.handle(event(1, .notification("permission_prompt"), 0.5), claudeFrontmost: false)
+        XCTAssertEqual(items().first?.questions, [])
+    }
+
+    func testSummaryOfThePreviousTurnIsNotShown() {
+        let s = SessionInfo(localId: "local_1", cliSessionId: "cli_1", title: "a", projectName: "p", lastFocusedAt: t(30),
+                            lastTurnEdgeAt: t(5), lastActivityAt: t(5), statusCategory: .completed, statusDetail: "прошлый итог",
+                            summaryIsCurrent: false)
+        tracker.update(sessions: [s])
+        XCTAssertEqual(dot(1), .blue)
+        XCTAssertNil(detail(1))
+    }
+
     func testHookGrayDoesNotShowStaleSummary() {
         let s = SessionInfo(localId: "local_1", cliSessionId: "cli_1", title: "a", projectName: "p", lastFocusedAt: t(30),
                             lastTurnEdgeAt: t(20), lastActivityAt: t(20), statusCategory: .completed, statusDetail: "старый итог")

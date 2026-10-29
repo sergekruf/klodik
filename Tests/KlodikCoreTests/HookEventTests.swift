@@ -76,6 +76,16 @@ final class HookEventTests: XCTestCase {
         XCTAssertNil(parse(common("Stop"))?.detail)
     }
 
+    func testAskUserQuestionOptions() {
+        let json = #", "tool_name": "AskUserQuestion", "tool_input": {"questions": [{"question": "Что генерируем?", "multiSelect": false, "options": [{"label": "Светлая версия", "description": "Пилот на одном артикуле"}, {"label": "Видео", "description": ""}, {"description": "без подписи"}]}, {"question": "", "options": []}, {"question": "Какие артикулы?", "multiSelect": true, "options": []}]}"#
+        XCTAssertEqual(parse(common("PreToolUse", json))?.questions, [
+            AskedQuestion(text: "Что генерируем?", options: [.init(label: "Светлая версия", description: "Пилот на одном артикуле"),
+                                                            .init(label: "Видео")]),
+            AskedQuestion(text: "Какие артикулы?", options: [], multiSelect: true),
+        ])
+        XCTAssertEqual(parse(common("PreToolUse", #", "tool_name": "Bash", "tool_input": {"command": "ls"}"#))?.questions, [])
+    }
+
     func testLongDetailIsClipped() {
         let long = String(repeating: "a", count: 300)
         let detail = parse(common("PermissionRequest", #", "tool_name": "Bash", "tool_input": {"command": "\#(long)"}"#))?.detail

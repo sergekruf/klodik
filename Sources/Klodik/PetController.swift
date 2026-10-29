@@ -31,6 +31,8 @@ final class PetController: NSObject, NSMenuDelegate {
     private lazy var settingsWindow = makeSettingsWindow()
     private let front = FrontAppWatcher()
     private let bubble = Bubble()
+    /// О какой сессии сейчас пузырь: в него дописывается итог, когда приложение его запишет.
+    private var bubbleItemId: String?
     private let listModel = SessionListModel()
     private lazy var popover = makePopover()
     private let detailTip = DetailTip()
@@ -184,6 +186,18 @@ final class PetController: NSObject, NSMenuDelegate {
         if hoveredId != nil { showDetailTip() }
     }
 
+    /// Сам Клодик на экране, без значка с числом: на него смотрит хвостик пузыря.
+    private var petOnScreen: NSRect {
+        panel.convertToScreen(content.sprite.convert(content.sprite.bounds, to: nil))
+    }
+
+    /// Что сделала или что просит сессия — для пузыря, с переводом итога, если он уже готов.
+    private func bubbleText(_ item: TrackedItem) -> String? {
+        if let question = item.questions.first { return question.text }
+        guard let detail = item.detail else { return nil }
+        return item.detailIsSummary ? translator.text(detail) : detail
+    }
+
     /// Новая серая — пузырь «ждёт ответа» и взмах, новая синяя — «готово» и радость.
     private func announce(_ items: [TrackedItem]) {
         let dots = Dictionary(items.map { ($0.localId, $0.dot) }, uniquingKeysWith: { first, _ in first })
@@ -192,11 +206,18 @@ final class PetController: NSObject, NSMenuDelegate {
               !front.isClaudeFrontmost, snoozedUntil == nil else { return }
 
         if let item = items.first(where: { $0.dot == .waiting && previous[$0.localId] != .waiting }) {
-            bubble.show(tr("Ждёт ответа: \(item.title)", "Waiting for you: \(item.title)"), above: panel.frame)
+            bubble.show(.init(label: tr("Ждёт ответа", "Waiting for you"), labelColor: .orange, title: item.title,
+                              text: bubbleText(item)), above: petOnScreen)
+            bubbleItemId = item.localId
             animator.playOnce(.wave)
         } else if let item = items.first(where: { $0.dot == .blue && previous[$0.localId] == nil }) {
-            bubble.show(tr("Готово: \(item.title)", "Done: \(item.title)"), above: panel.frame)
+            bubble.show(.init(label: tr("Готово", "Done"), labelColor: .blue, title: item.title,
+                              text: bubbleText(item)), above: petOnScreen)
+            bubbleItemId = item.localId
             animator.playOnce(.happy)
+        } else if bubble.isShown, let id = bubbleItemId, let item = items.first(where: { $0.localId == id }) {
+            // Итог хода приложение пишет через несколько секунд после конца хода — дописываем его в пузырь.
+            bubble.update(text: bubbleText(item))
         }
     }
 
@@ -282,7 +303,7 @@ final class PetController: NSObject, NSMenuDelegate {
             try HookInstaller.install(port: state.port)
         } catch {
             NSLog("Klodik: не удалось поставить хуки: \(error)")
-            bubble.show(tr("Не получилось: ~/.claude/settings.json не читается", "Failed: can't read ~/.claude/settings.json"), above: panel.frame, for: 5)
+            bubble.show(tr("Не получилось: ~/.claude/settings.json не читается", "Failed: can't read ~/.claude/settings.json"), above: petOnScreen, for: 5)
         }
         refreshHooksState()
     }
@@ -292,7 +313,7 @@ final class PetController: NSObject, NSMenuDelegate {
             try HookInstaller.uninstall()
         } catch {
             NSLog("Klodik: не удалось убрать хуки: \(error)")
-            bubble.show(tr("Не получилось: ~/.claude/settings.json не читается", "Failed: can't read ~/.claude/settings.json"), above: panel.frame, for: 5)
+            bubble.show(tr("Не получилось: ~/.claude/settings.json не читается", "Failed: can't read ~/.claude/settings.json"), above: petOnScreen, for: 5)
         }
         refreshHooksState()
     }
@@ -416,7 +437,7 @@ final class PetController: NSObject, NSMenuDelegate {
     private func openNextSession() {
         if Self.debug { NSLog("Klodik: нажато \(HotKey.display)") }
         guard let item = nextSession.pick(from: tracker.items(now: Date()), now: Date()) else {
-            bubble.show(tr("Никто не ждёт", "Nobody is waiting"), above: panel.frame)
+            bubble.show(tr("Никто не ждёт", "Nobody is waiting"), above: petOnScreen)
             return
         }
         Self.openInClaude(item)
@@ -437,10 +458,10 @@ final class PetController: NSObject, NSMenuDelegate {
         return popover
     }
 
-    /// Окошко слева от списка напротив сессии под курсором. Без строки «что просит» — без окошка.
+    /// Окошко слева от списка напротив сессии под курсором: «что просит» или вопрос с вариантами. Без них — без окошка.
     private func showDetailTip() {
         guard popover.isShown, let id = hoveredId, let view = popover.contentViewController?.view, let window = view.window,
-              let detail = listModel.items.first(where: { $0.localId == id })?.detail else {
+              let item = listModel.items.first(where: { $0.localId == id }), item.detail != nil || !item.questions.isEmpty else {
             detailTip.hide()
             return
         }
@@ -451,7 +472,7 @@ final class PetController: NSObject, NSMenuDelegate {
         if mouse.y < row.minY - 2 || mouse.y > row.maxY + 2 {
             row = NSRect(x: row.minX, y: mouse.y - 22, width: row.width, height: 44)
         }
-        detailTip.show(detail, beside: row, list: window.frame)
+        detailTip.show(detail: item.detail, questions: item.questions, beside: row, list: window.frame)
     }
 
     private func toggleList() {
@@ -544,7 +565,15 @@ final class PetController: NSObject, NSMenuDelegate {
     }
 
     /// KLODIK_DEMO=<анимация> крутит её без остановки — для замеров нагрузки.
+    /// KLODIK_DEMO_BUBBLE=<текст> — пузырь «Готово» с этим текстом через секунду после запуска (вёрстка пузыря).
     private func startDemoIfAsked() {
+        if let text = ProcessInfo.processInfo.environment["KLODIK_DEMO_BUBBLE"] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                guard let self else { return }
+                bubble.show(.init(label: tr("Готово", "Done"), labelColor: .blue, title: "Лендинг кофейни", text: text),
+                            above: petOnScreen, for: 30)
+            }
+        }
         guard let name = ProcessInfo.processInfo.environment["KLODIK_DEMO"], let anim = PetAnimation(rawValue: name) else { return }
         demo = anim
         if anim.loops {

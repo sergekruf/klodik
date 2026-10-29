@@ -27,6 +27,8 @@ public struct TrackedItem: Equatable {
     /// `detail` — итог хода, который пишет Claude (бывает по-английски, его можно переводить).
     /// Команды и файлы из хуков переводить нельзя.
     public var detailIsSummary = false
+    /// Вопросы с вариантами ответа, если сессия ждёт ответа на AskUserQuestion (из хуков).
+    public var questions: [AskedQuestion] = []
 }
 
 /// Сводит файлы сессий, события хуков и метки пользователя в список для Клодика.
@@ -72,6 +74,10 @@ public final class Tracker {
     private var lastEventAt: [String: Date] = [:]
     /// Что просит серая сессия из хуков: команда, файл, текст вопроса.
     private var waitDetail: [String: String] = [:]
+    /// Вопросы с вариантами, на которые ждёт ответа серая сессия.
+    private var waitQuestions: [String: [AskedQuestion]] = [:]
+    /// Вопросы последнего PreToolUse: AskUserQuestion, если это он, иначе пусто.
+    private var pendingQuestions: [String: [AskedQuestion]] = [:]
     /// Последний инструмент перед запросом: PreToolUse приходит раньше уведомления о вопросе или разрешении.
     private var pendingTool: [String: String] = [:]
     /// Сессия закончила ход у пользователя на глазах — прочитана до этого момента. По `localId`.
@@ -112,27 +118,35 @@ public final class Tracker {
             answeredAt[cli] = event.at
             waitingSince[cli] = nil
             waitDetail[cli] = nil
+            waitQuestions[cli] = nil
             workingAt[cli] = event.at
         case .preTool:
             // PreToolUse приходит и перед запросом разрешения, поэтому ожидание он не снимает.
             workingAt[cli] = event.at
             pendingTool[cli] = event.detail
+            pendingQuestions[cli] = event.questions
         case .postTool:
             waitingSince[cli] = nil
             waitDetail[cli] = nil
+            waitQuestions[cli] = nil
             workingAt[cli] = event.at
         case .permissionRequest:
             startWaiting(cli, at: event.at)
             if let detail = event.detail { waitDetail[cli] = detail }
+            if !event.questions.isEmpty { waitQuestions[cli] = event.questions }
         case .notification(let type):
             if Self.questionNotifications.contains(type) {
                 startWaiting(cli, at: event.at)
                 // Текст уведомления общий («Claude needs your permission…»), инструмент из PreToolUse говорит больше.
                 if waitDetail[cli] == nil { waitDetail[cli] = pendingTool[cli] ?? event.detail }
+                if waitQuestions[cli] == nil, let questions = pendingQuestions[cli], !questions.isEmpty {
+                    waitQuestions[cli] = questions
+                }
             }
         case .stop, .stopFailure:
             waitingSince[cli] = nil
             waitDetail[cli] = nil
+            waitQuestions[cli] = nil
             workingAt[cli] = nil
             stoppedAt[cli] = event.at
             if claudeFrontmost, let local = localByCli[cli], local == onScreenId {
@@ -142,6 +156,7 @@ public final class Tracker {
         case .sessionEnd:
             waitingSince[cli] = nil
             waitDetail[cli] = nil
+            waitQuestions[cli] = nil
             workingAt[cli] = nil
         }
         cleanUpMarks()
@@ -192,7 +207,8 @@ public final class Tracker {
             result.append(TrackedItem(localId: s.localId, cliSessionId: s.cliSessionId, title: s.title,
                                       projectName: s.projectName, dot: dot, waitingSince: since,
                                       openedSinceWaiting: dot == .waiting && (s.lastFocusedAt ?? .distantPast) > since,
-                                      detail: detail(s, dot: dot), detailIsSummary: !detailFromHooks(s, dot: dot)))
+                                      detail: detail(s, dot: dot), detailIsSummary: !detailFromHooks(s, dot: dot),
+                                      questions: detailFromHooks(s, dot: dot) ? s.cliSessionId.flatMap { waitQuestions[$0] } ?? [] : []))
         }
         return result.sorted { $0.waitingSince > $1.waitingSince }
     }
@@ -243,10 +259,11 @@ public final class Tracker {
     }
 
     /// Серая из хуков — что она просит сейчас (итог прошлого хода из файла тут устарел).
-    /// Серая из файла и синяя — итог хода, который приложение Claude записало в файл.
+    /// Серая из файла и синяя — итог хода, который приложение Claude записало в файл (если он уже про последний ход).
     private func detail(_ s: SessionInfo, dot: TrackedItem.Dot) -> String? {
         if detailFromHooks(s, dot: dot), let cli = s.cliSessionId { return waitDetail[cli] }
-        return s.statusDetail
+        // Итог прошлого хода к новому не подходит: пока приложение пишет новый, строки нет.
+        return s.summaryIsCurrent ? s.statusDetail : nil
     }
 
     private func detailFromHooks(_ s: SessionInfo, dot: TrackedItem.Dot) -> Bool {

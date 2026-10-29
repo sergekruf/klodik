@@ -57,6 +57,14 @@ final class SessionFileTests: XCTestCase {
         XCTAssertEqual(info.projectName, "vk-constructor")
     }
 
+    func testSummaryOfAnEarlierTurnIsNotCurrent() throws {
+        let stale = #"{"sessionId": "local_a", "postTurnSummary": {"status_detail": "старый"}, "postTurnSummaryFor": "u1", "lastAssistantUuid": "u2"}"#
+        let fresh = #"{"sessionId": "local_a", "postTurnSummary": {"status_detail": "новый"}, "postTurnSummaryFor": "u2", "lastAssistantUuid": "u2"}"#
+        XCTAssertFalse(try XCTUnwrap(SessionFile.parse(Data(stale.utf8))).summaryIsCurrent)
+        XCTAssertTrue(try XCTUnwrap(SessionFile.parse(Data(fresh.utf8))).summaryIsCurrent)
+        XCTAssertTrue(try XCTUnwrap(SessionFile.parse(Data(Fixtures.full.utf8))).summaryIsCurrent)   // без привязки — верим
+    }
+
     func testUnknownStatusCategoryIsKeptAsOther() throws {
         let json = #"{"sessionId": "local_a", "postTurnSummary": {"status_category": "something_new"}}"#
         XCTAssertEqual(try XCTUnwrap(SessionFile.parse(Data(json.utf8))).statusCategory, .other)
