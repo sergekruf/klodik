@@ -17,6 +17,12 @@ final class SessionListModel: ObservableObject {
     @Published var update: UpdateCheck.Release?
     /// Меняется при каждом открытии списка: прокрутить к самым свежим сессиям.
     @Published var openedAt = Date()
+    /// Поиск и выбранный проект. Сбрасываются при каждом открытии списка.
+    @Published var query = ""
+    @Published var project: String?
+
+    var visibleItems: [TrackedItem] { ListFilter.apply(items, query: query, project: project) }
+    var showsFilter: Bool { items.count >= ListFilter.showFrom }
 
     var open: (TrackedItem) -> Void = { _ in }
     var toggleRemind: (TrackedItem) -> Void = { _ in }
@@ -33,11 +39,21 @@ final class SessionListModel: ObservableObject {
 
 struct SessionListView: View {
     @ObservedObject var model: SessionListModel
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if model.showsFilter {
+                filterBar
+                Divider()
+            }
             if model.items.isEmpty {
                 Text(tr("Никто не ждёт", "Nobody is waiting"))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else if model.visibleItems.isEmpty {
+                Text(tr("Ничего не нашлось", "Nothing found"))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
@@ -45,7 +61,7 @@ struct SessionListView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 2) {
-                            ForEach(model.items, id: \.localId) { item in
+                            ForEach(model.visibleItems, id: \.localId) { item in
                                 SessionRow(item: item, reminded: model.remindIds.contains(item.localId), now: model.now,
                                            onHover: { model.hover(item, $0, $1) })
                                     .onTapGesture { model.open(item) }
@@ -61,7 +77,7 @@ struct SessionListView: View {
                     }
                     .frame(maxHeight: 360)
                     .onChange(of: model.openedAt) {
-                        if let first = model.items.first { proxy.scrollTo(first.localId, anchor: .top) }
+                        if let first = model.visibleItems.first { proxy.scrollTo(first.localId, anchor: .top) }
                     }
                 }
             }
@@ -123,6 +139,53 @@ struct SessionListView: View {
         }
         .frame(width: 340)
         .coordinateSpace(name: SessionRow.listSpace)
+        .onChange(of: model.openedAt) { searchFocused = model.showsFilter }
+    }
+
+    /// Поиск по названию и проекту и кнопки проектов: «Все», потом проекты, где больше сессий.
+    private var filterBar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField(tr("Поиск по сессиям и проектам", "Search sessions and projects"), text: $model.query)
+                    .textFieldStyle(.plain)
+                    .focused($searchFocused)
+                if !model.query.isEmpty {
+                    Button { model.query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                        .buttonStyle(.borderless)
+                }
+            }
+            let projects = ListFilter.projects(model.items)
+            if projects.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        chip(tr("Все", "All"), count: model.items.count, selected: model.project == nil) { model.project = nil }
+                        ForEach(projects, id: \.name) { project in
+                            chip(project.name, count: project.count, selected: model.project == project.name) {
+                                model.project = model.project == project.name ? nil : project.name
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func chip(_ title: String, count: Int, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Text(title).lineLimit(1)
+                Text("\(count)").foregroundStyle(selected ? .white.opacity(0.8) : .secondary)
+            }
+            .font(.caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .foregroundStyle(selected ? .white : .primary)
+            .background(Capsule().fill(selected ? Color.accentColor : Color.primary.opacity(0.08)))
+        }
+        .buttonStyle(.plain)
     }
 }
 

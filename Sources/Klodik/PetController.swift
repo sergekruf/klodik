@@ -117,6 +117,7 @@ final class PetController: NSObject, NSMenuDelegate {
         applyHotKey()
         startDemoIfAsked()
         refresh()
+        watchUserActivity()
 
         if ProcessInfo.processInfo.environment["KLODIK_SHOW_SETTINGS"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.openSettings() }
@@ -129,6 +130,37 @@ final class PetController: NSObject, NSMenuDelegate {
                 self?.toggleList()
             }
         }
+    }
+
+    // MARK: - Утренняя сводка
+
+    /// Первая активность за день: Mac проснулся, включился экран или пользователь переключил приложение.
+    /// И при запуске — Клодик стартует при входе в систему, то есть обычно утром.
+    private func watchUserActivity() {
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didActivateApplicationNotification, NSWorkspace.didWakeNotification,
+                     NSWorkspace.screensDidWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.showMorningDigestIfDue() }
+        }
+        // Файлы сессий и хуки должны успеть прочитаться.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.showMorningDigestIfDue() }
+    }
+
+    /// Раз в день после шести утра: сколько сессий ждут решения и какая дольше всех. Клик открывает её.
+    private func showMorningDigestIfDue() {
+        let now = Date()
+        guard demo == nil, snoozedUntil == nil, MorningDigest.isDue(lastShown: state.lastDigestAt, now: now) else { return }
+        state.lastDigestAt = now
+        save()
+        guard let digest = MorningDigest.make(items: tracker.items(now: now)) else { return }
+        let oldest = digest.oldest
+        let waited = WaitTime.duration(now.timeIntervalSince(oldest.waitingSince))
+        bubble.show(.init(label: tr("Доброе утро", "Good morning"), labelColor: .orange,
+                          title: tr("Ждут ваших решений: \(digest.waiting)", "Waiting for your decision: \(digest.waiting)"),
+                          text: tr("Дольше всех «\(oldest.title)»: \(waited)", "Longest: “\(oldest.title)”, \(waited)")),
+                    above: petOnScreen, onClick: { Self.openInClaude(oldest) })
+        bubbleItemId = nil
+        animator.playOnce(.wave)
     }
 
     /// Пометки «непрочитано» из Claude. Не читается (формат поменялся) — работаем без них.
@@ -482,6 +514,8 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         refresh()
         refreshHooksState()
+        listModel.query = ""
+        listModel.project = nil
         listModel.openedAt = Date()   // каждый раз с самых свежих, где бы ни остановилась прокрутка в прошлый раз
         NSApp.activate(ignoringOtherApps: true)   // иначе список не получит Esc и клики мимо
         popover.show(relativeTo: content.sprite.bounds, of: content.sprite, preferredEdge: .maxY)

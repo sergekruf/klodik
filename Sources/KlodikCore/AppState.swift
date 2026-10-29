@@ -22,6 +22,8 @@ public struct AppState: Codable, Equatable {
     /// Последний релиз на GitHub по прошлой проверке: плашка «вышла версия» переживает перезапуск.
     public var latestVersion: String?
     public var latestURL: URL?
+    /// Когда показали утреннюю сводку решений: раз в день.
+    public var lastDigestAt: Date?
 
     public init() {}
 
@@ -40,6 +42,7 @@ public struct AppState: Codable, Equatable {
         lastUpdateCheck = try c.decodeIfPresent(Date.self, forKey: .lastUpdateCheck)
         latestVersion = try c.decodeIfPresent(String.self, forKey: .latestVersion)
         latestURL = try c.decodeIfPresent(URL.self, forKey: .latestURL)
+        lastDigestAt = try c.decodeIfPresent(Date.self, forKey: .lastDigestAt)
     }
 
     /// KLODIK_STATE_DIR — другая папка для state.json (демо-запуск рядом с настоящим Клодиком).
