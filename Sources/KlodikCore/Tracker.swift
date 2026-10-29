@@ -24,6 +24,9 @@ public struct TrackedItem: Equatable {
     public var openedSinceWaiting: Bool
     /// Что просит или что сделала: «Bash: npm run build», текст вопроса, итог хода от приложения Claude.
     public var detail: String?
+    /// `detail` — итог хода, который пишет Claude (бывает по-английски, его можно переводить).
+    /// Команды и файлы из хуков переводить нельзя.
+    public var detailIsSummary = false
 }
 
 /// Сводит файлы сессий, события хуков и метки пользователя в список для Клодика.
@@ -189,7 +192,7 @@ public final class Tracker {
             result.append(TrackedItem(localId: s.localId, cliSessionId: s.cliSessionId, title: s.title,
                                       projectName: s.projectName, dot: dot, waitingSince: since,
                                       openedSinceWaiting: dot == .waiting && (s.lastFocusedAt ?? .distantPast) > since,
-                                      detail: detail(s, dot: dot)))
+                                      detail: detail(s, dot: dot), detailIsSummary: !detailFromHooks(s, dot: dot)))
         }
         return result.sorted { $0.waitingSince > $1.waitingSince }
     }
@@ -242,8 +245,13 @@ public final class Tracker {
     /// Серая из хуков — что она просит сейчас (итог прошлого хода из файла тут устарел).
     /// Серая из файла и синяя — итог хода, который приложение Claude записало в файл.
     private func detail(_ s: SessionInfo, dot: TrackedItem.Dot) -> String? {
-        if dot == .waiting, let cli = s.cliSessionId, waitingSince[cli] != nil { return waitDetail[cli] }
+        if detailFromHooks(s, dot: dot), let cli = s.cliSessionId { return waitDetail[cli] }
         return s.statusDetail
+    }
+
+    private func detailFromHooks(_ s: SessionInfo, dot: TrackedItem.Dot) -> Bool {
+        guard dot == .waiting, let cli = s.cliSessionId else { return false }
+        return waitingSince[cli] != nil
     }
 
     /// Последний признак жизни сессии: конец хода или новый запрос ответа.

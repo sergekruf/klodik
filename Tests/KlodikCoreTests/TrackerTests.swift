@@ -310,6 +310,7 @@ final class TrackerTests: XCTestCase {
         tracker.handle(HookEvent(sessionId: "cli_1", kind: .permissionRequest("Bash"), detail: "Bash: npm run build", at: t(2)),
                        claudeFrontmost: false)
         XCTAssertEqual(detail(1), "Bash: npm run build")
+        XCTAssertEqual(items().first?.detailIsSummary, false)   // команду не переводим
         tracker.handle(event(1, .postTool("Bash"), 1), claudeFrontmost: false)
         XCTAssertNil(dot(1))
     }
@@ -331,6 +332,7 @@ final class TrackerTests: XCTestCase {
         tracker.update(sessions: [blocked, done])
         XCTAssertEqual(detail(1), "ждёт выбора обложки")
         XCTAssertEqual(detail(2), "сайт собран")
+        XCTAssertEqual(items().map(\.detailIsSummary), [true, true])
     }
 
     func testHookGrayDoesNotShowStaleSummary() {

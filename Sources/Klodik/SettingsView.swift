@@ -1,5 +1,6 @@
 import SwiftUI
 import ServiceManagement
+import Translation
 import KlodikCore
 
 /// Автозапуск при входе в систему через SMAppService.
@@ -21,12 +22,17 @@ final class SettingsModel: ObservableObject {
     /// Сочетание занято другим приложением.
     @Published var hotKeyBusy = false
     @Published var hooksInstalled = false
+    /// Английские итоги ходов можно переводить, но языки перевода ещё не скачаны.
+    @Published var translationNeedsDownload = false
+    var translationLanguages = (source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "ru"))
 
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
     var setReminderScale: (ReminderScale) -> Void = { _ in }
     var setHotKeyEnabled: (Bool) -> Void = { _ in }
     var setCheckUpdates: (Bool) -> Void = { _ in }
     var toggleHooks: () -> Void = {}
+    /// Окно скачивания языков закрылось: скачали или отказались.
+    var translationPrepared: () -> Void = {}
 }
 
 struct SettingsView: View {
@@ -85,6 +91,9 @@ struct SettingsView: View {
                 }
                 Toggle(tr("Проверять новые версии на GitHub", "Check GitHub for new versions"),
                        isOn: Binding(get: { model.checkUpdates }, set: { model.setCheckUpdates($0) }))
+                if #available(macOS 15, *), model.translationNeedsDownload {
+                    TranslationDownloadRow(model: model)
+                }
             }
 
             Section(tr("Точки в списке", "Dots in the list")) {
@@ -114,5 +123,31 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 420)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Строка в настройках, пока языки перевода не скачаны. Скачивание спрашивает сама macOS в своём окне.
+@available(macOS 15, *)
+private struct TranslationDownloadRow: View {
+    @ObservedObject var model: SettingsModel
+    @State private var configuration: TranslationSession.Configuration?
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tr("Переводить итоги на русский", "Translate summaries into English"))
+                Text(tr("Claude иногда пишет итог хода по-английски. Перевод идёт на этом Mac, языки нужно один раз скачать",
+                         "Claude sometimes writes turn summaries in Russian. Translation runs on this Mac; download the languages once"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(tr("Скачать", "Download")) {
+                configuration = .init(source: model.translationLanguages.source, target: model.translationLanguages.target)
+            }
+        }
+        .translationTask(configuration) { session in
+            try? await session.prepareTranslation()
+            await MainActor.run { model.translationPrepared() }
+        }
     }
 }

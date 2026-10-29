@@ -20,6 +20,7 @@ final class PetController: NSObject, NSMenuDelegate {
 
     private let store = SessionStore()
     private let claudeUnread = ClaudeUnread()
+    private let translator = SummaryTranslator()
     private var server: EventServer?
     /// Сколько соседних портов уже перепробовали, если основной занят.
     private var portAttempts = 0
@@ -80,6 +81,12 @@ final class PetController: NSObject, NSMenuDelegate {
         claudeUnread.onChange = { [weak self] in self?.reloadClaudeUnread() }
         reloadClaudeUnread()
         claudeUnread.startWatching()
+        translator.onChange = { [weak self] in
+            guard let self else { return }
+            settingsModel.translationNeedsDownload = translator.status == .needsDownload
+            scheduleRefresh()
+        }
+        translator.checkStatus()
         if front.isClaudeFrontmost { tracker.markOnScreenRead(at: Date()) }
 
         startServer(port: state.port)
@@ -159,7 +166,12 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         announce(items)
 
-        listModel.items = items
+        listModel.items = items.map { item in
+            guard item.detailIsSummary, let detail = item.detail else { return item }
+            var item = item
+            item.detail = translator.text(detail)
+            return item
+        }
         listModel.remindIds = Set(tracker.remind.keys)
         listModel.now = now
         listModel.snoozed = snoozedUntil != nil
@@ -314,6 +326,8 @@ final class PetController: NSObject, NSMenuDelegate {
             self?.checkForUpdateIfDue()
         }
         settingsModel.toggleHooks = { [weak self] in self?.toggleHooks() }
+        settingsModel.translationLanguages = (translator.source, translator.target)
+        settingsModel.translationPrepared = { [weak self] in self?.translator.checkStatus() }
 
         let host = NSHostingController(rootView: SettingsView(model: settingsModel))
         host.sizingOptions = [.preferredContentSize]
@@ -339,6 +353,8 @@ final class PetController: NSObject, NSMenuDelegate {
         settingsModel.hotKeyEnabled = state.hotKeyEnabled
         settingsModel.checkUpdates = state.checkUpdates
         settingsModel.hotKeyBusy = state.hotKeyEnabled && hotKey == nil
+        settingsModel.translationNeedsDownload = translator.status == .needsDownload
+        translator.checkStatus()
         refreshHooksState()
     }
 
