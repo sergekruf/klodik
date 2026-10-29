@@ -42,11 +42,15 @@ if CommandLine.arguments.contains("--sessions") {
     print("Отмечены непрочитанными в Claude: \(unread.map { "\($0.count)" } ?? "не читается"), чтение: \(unreadMs) мс")
     tracker.claudeUnread = unread ?? []
     let items = tracker.items(now: Date())
-    let gray = items.filter { $0.dot == .gray }
-    print("Список Клодика: серых \(gray.count) (из них открывали \(gray.filter(\.openedSinceWaiting).count)), синих \(items.filter { $0.dot == .blue }.count)")
+    let waiting = items.filter { $0.dot == .waiting }
+    print("Список Клодика: ждут ответа \(waiting.count) (из них открывали \(waiting.filter(\.openedSinceWaiting).count)), синих \(items.filter { $0.dot == .blue }.count), отмечены \(items.filter { $0.dot == .unread || $0.dot == .remind }.count)")
     for item in items {
         let minutes = Int(Date().timeIntervalSince(item.waitingSince) / 60)
-        let dot = item.dot == .gray ? (item.openedSinceWaiting ? "◌" : "●") : "◆"
+        let dot = switch item.dot {
+        case .waiting: item.openedSinceWaiting ? "○" : "●"
+        case .blue: "◆"
+        case .unread, .remind: "▪"
+        }
         print("  \(dot) \(item.title) [\(item.projectName)] — ждёт \(minutes) мин")
     }
     let attention = AttentionPolicy().attention(items: items, workingCount: 0, now: Date(), claudeFrontmost: false,

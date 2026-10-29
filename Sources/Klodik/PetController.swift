@@ -152,7 +152,7 @@ final class PetController: NSObject, NSMenuDelegate {
                                          lastActivityAt: lastActivityAt)
 
         content.badge.count = attention.badge
-        content.badge.urgent = items.contains { $0.dot == .gray }
+        content.badge.urgent = items.contains { $0.dot == .waiting }
         if demo == nil {
             animator.setBase(attention.base)
             apply(attention.nudge)
@@ -174,7 +174,7 @@ final class PetController: NSObject, NSMenuDelegate {
         guard let previous = previousDots, demo == nil,
               !front.isClaudeFrontmost, snoozedUntil == nil else { return }
 
-        if let item = items.first(where: { $0.dot == .gray && previous[$0.localId] != .gray }) {
+        if let item = items.first(where: { $0.dot == .waiting && previous[$0.localId] != .waiting }) {
             bubble.show(tr("Ждёт ответа: \(item.title)", "Waiting for you: \(item.title)"), above: panel.frame)
             animator.playOnce(.wave)
         } else if let item = items.first(where: { $0.dot == .blue && previous[$0.localId] == nil }) {

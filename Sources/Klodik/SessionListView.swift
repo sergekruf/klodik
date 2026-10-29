@@ -161,7 +161,8 @@ private struct SessionRow: View {
     }
 }
 
-/// Серая — нужен ответ (кольцо, если уже открывали), синяя — не прочитана, синяя с колокольчиком — «напомнить».
+/// Как в Claude: оранжевая — нужен ответ (кольцо, если уже открывали), синяя — закончила и не прочитана,
+/// серая — отмечена непрочитанной в Claude, серая с колокольчиком — «Напомнить» в Клодике.
 private struct Dot: View {
     let dot: TrackedItem.Dot
     let opened: Bool
@@ -169,15 +170,17 @@ private struct Dot: View {
     var body: some View {
         Group {
             switch dot {
-            case .gray where opened:
-                Circle().strokeBorder(Color.gray, lineWidth: 2)
-            case .gray:
-                Circle().fill(Color.gray)
+            case .waiting where opened:
+                Circle().strokeBorder(Color.orange, lineWidth: 2)
+            case .waiting:
+                Circle().fill(Color.orange)
             case .blue:
                 Circle().fill(Color.blue)
+            case .unread:
+                Circle().fill(Color.gray)
             case .remind:
                 ZStack {
-                    Circle().fill(Color.blue)
+                    Circle().fill(Color.gray)
                     Image(systemName: "bell.fill").font(.system(size: 6)).foregroundStyle(.white)
                 }
             }

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Какую сессию открыть по горячей клавише. Сначала неоткрытые серые, потом открытые серые, «напомнить» и синие;
+/// Какую сессию открыть по горячей клавише. Сначала неоткрытые ждущие ответа, потом открытые, отмеченные («напомнить» и непрочитанные в Claude) и синие;
 /// внутри группы — кто дольше ждёт. Повторное нажатие идёт к следующей, пока очередь не кончится.
 public struct NextSession {
     /// Пауза между нажатиями, после которой очередь начинается заново.
@@ -28,8 +28,8 @@ public struct NextSession {
     static func order(_ items: [TrackedItem]) -> [TrackedItem] {
         func rank(_ item: TrackedItem) -> Int {
             switch item.dot {
-            case .gray: item.openedSinceWaiting ? 1 : 0
-            case .remind: 2
+            case .waiting: item.openedSinceWaiting ? 1 : 0
+            case .remind, .unread: 2
             case .blue: 3
             }
         }

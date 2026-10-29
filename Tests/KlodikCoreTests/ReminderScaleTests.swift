@@ -9,7 +9,7 @@ final class ReminderScaleTests: XCTestCase {
     func nudge(_ scale: ReminderScale, waiting minutes: Double) -> Attention.Nudge {
         var config = AttentionPolicy.Config()
         scale.apply(to: &config)
-        let item = TrackedItem(localId: "a", cliSessionId: nil, title: "s", projectName: "p", dot: .gray,
+        let item = TrackedItem(localId: "a", cliSessionId: nil, title: "s", projectName: "p", dot: .waiting,
                                waitingSince: now.addingTimeInterval(-minutes * 60), openedSinceWaiting: false, detail: nil)
         return AttentionPolicy(config: config).attention(items: [item], workingCount: 0, now: now, claudeFrontmost: false,
                                                          snoozedUntil: nil, lastActivityAt: now).nudge

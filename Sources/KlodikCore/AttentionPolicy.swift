@@ -57,7 +57,7 @@ public struct AttentionPolicy {
         guard !items.isEmpty, !silenced else { return Attention(base: base, nudge: .none, badge: items.count) }
 
         let freshUnopenedGray = items.filter {
-            $0.dot == .gray && !$0.openedSinceWaiting && now.timeIntervalSince($0.waitingSince) < config.grayStaleAfter
+            $0.dot == .waiting && !$0.openedSinceWaiting && now.timeIntervalSince($0.waitingSince) < config.grayStaleAfter
         }
         guard let oldest = freshUnopenedGray.map(\.waitingSince).min() else {
             return Attention(base: base, nudge: .wave(every: config.waveEvery), badge: items.count)

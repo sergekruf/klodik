@@ -19,27 +19,27 @@ final class AttentionPolicyTests: XCTestCase {
     // MARK: эскалация
 
     func testFreshUnopenedGrayJumpsOncePerMinute() {
-        XCTAssertEqual(attention([item(.gray, waiting: 1)]).nudge, .jump(every: 60))
+        XCTAssertEqual(attention([item(.waiting, waiting: 1)]).nudge, .jump(every: 60))
     }
 
     func testGrayWaitingOver2MinutesJumpsEvery30SecondsAndNeverNonStop() {
-        XCTAssertEqual(attention([item(.gray, waiting: 2)]).nudge, .jump(every: 30))
-        XCTAssertEqual(attention([item(.gray, waiting: 9.9)]).nudge, .jump(every: 30))
-        XCTAssertEqual(attention([item(.gray, waiting: 600)]).nudge, .jump(every: 30))
+        XCTAssertEqual(attention([item(.waiting, waiting: 2)]).nudge, .jump(every: 30))
+        XCTAssertEqual(attention([item(.waiting, waiting: 9.9)]).nudge, .jump(every: 30))
+        XCTAssertEqual(attention([item(.waiting, waiting: 600)]).nudge, .jump(every: 30))
     }
 
     func testOldestUnopenedGrayDecides() {
-        let items = [item(.gray, waiting: 1), item(.gray, waiting: 12), item(.gray, waiting: 60, opened: true)]
+        let items = [item(.waiting, waiting: 1), item(.waiting, waiting: 12), item(.waiting, waiting: 60, opened: true)]
         XCTAssertEqual(attention(items).nudge, .jump(every: 30))
     }
 
     func testOpenedGraysAreNotAReasonToJump() {
-        XCTAssertEqual(attention([item(.gray, waiting: 60, opened: true)]).nudge, .wave(every: 300))
+        XCTAssertEqual(attention([item(.waiting, waiting: 60, opened: true)]).nudge, .wave(every: 300))
     }
 
     func testGrayWaitingOverADayOnlyWaves() {
-        XCTAssertEqual(attention([item(.gray, waiting: 24 * 60)]).nudge, .wave(every: 300))
-        XCTAssertEqual(attention([item(.gray, waiting: 4 * 24 * 60), item(.gray, waiting: 3)]).nudge, .jump(every: 30))
+        XCTAssertEqual(attention([item(.waiting, waiting: 24 * 60)]).nudge, .wave(every: 300))
+        XCTAssertEqual(attention([item(.waiting, waiting: 4 * 24 * 60), item(.waiting, waiting: 3)]).nudge, .jump(every: 30))
     }
 
     // MARK: синие и «напомнить»
@@ -50,20 +50,20 @@ final class AttentionPolicyTests: XCTestCase {
     }
 
     func testBadgeCountsEverything() {
-        let items = [item(.gray, waiting: 1), item(.gray, waiting: 5, opened: true), item(.blue, waiting: 3)]
+        let items = [item(.waiting, waiting: 1), item(.waiting, waiting: 5, opened: true), item(.blue, waiting: 3)]
         XCTAssertEqual(attention(items).badge, 3)
     }
 
     // MARK: тишина
 
     func testClaudeInFrontMeansBadgeOnly() {
-        let a = attention([item(.gray, waiting: 30)], frontmost: true)
+        let a = attention([item(.waiting, waiting: 30)], frontmost: true)
         XCTAssertEqual(a.nudge, .none)
         XCTAssertEqual(a.badge, 1)
     }
 
     func testSnoozeSilencesUntilItEnds() {
-        let items = [item(.gray, waiting: 30)]
+        let items = [item(.waiting, waiting: 30)]
         XCTAssertEqual(attention(items, snoozedUntil: now.addingTimeInterval(60)).nudge, .none)
         XCTAssertEqual(attention(items, snoozedUntil: now.addingTimeInterval(-1)).nudge, .jump(every: 30))
     }
@@ -85,7 +85,7 @@ final class AttentionPolicyTests: XCTestCase {
     }
 
     func testWorkingStaysTheBaseUnderNudges() {
-        let a = attention([item(.gray, waiting: 1)], working: 1)
+        let a = attention([item(.waiting, waiting: 1)], working: 1)
         XCTAssertEqual(a.base, .working)
         XCTAssertEqual(a.nudge, .jump(every: 60))
     }

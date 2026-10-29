@@ -3,12 +3,14 @@ import Foundation
 /// Строка списка Клодика: сессия, которой нужен пользователь.
 public struct TrackedItem: Equatable {
     public enum Dot: Equatable {
-        /// Нужен ответ: разрешение, вопрос, решение.
-        case gray
-        /// Закончила, не прочитана.
+        /// Нужен ответ: разрешение, вопрос, решение. Оранжевая.
+        case waiting
+        /// Закончила, не прочитана. Синяя.
         case blue
-        /// Пользователь сам попросил напомнить.
+        /// Пользователь сам попросил напомнить в Клодике. Серая с колокольчиком.
         case remind
+        /// Пользователь отметил её непрочитанной в самом Claude. Серая, как у Claude.
+        case unread
     }
 
     public var localId: String
@@ -176,14 +178,17 @@ public final class Tracker {
             if !unreadInClaude, let hiddenAt = hidden[s.localId], lastSignal(s) <= hiddenAt { continue }
 
             var state = needState(s, now: now)
-            if let mark, state?.dot != .gray { state = (.remind, mark) }
-            // Отметили непрочитанной в Claude — синяя, как у Claude в боковой панели. Время — конец последнего хода.
-            if unreadInClaude, state == nil, let edge = s.lastTurnEdgeAt ?? s.lastActivityAt { state = (.blue, edge) }
+            if let mark, state?.dot != .waiting { state = (.remind, mark) }
+            // Отметили непрочитанной в Claude. Ждущая ответа и «Напомнить» важнее; синяя тоже уступает,
+            // как и в Claude: ручная метка серая. Время — конец последнего хода.
+            if unreadInClaude, state == nil || state?.dot == .blue, let edge = s.lastTurnEdgeAt ?? s.lastActivityAt {
+                state = (.unread, edge)
+            }
             guard let (dot, since) = state else { continue }
 
             result.append(TrackedItem(localId: s.localId, cliSessionId: s.cliSessionId, title: s.title,
                                       projectName: s.projectName, dot: dot, waitingSince: since,
-                                      openedSinceWaiting: dot == .gray && (s.lastFocusedAt ?? .distantPast) > since,
+                                      openedSinceWaiting: dot == .waiting && (s.lastFocusedAt ?? .distantPast) > since,
                                       detail: detail(s, dot: dot)))
         }
         return result.sorted { $0.waitingSince > $1.waitingSince }
@@ -211,14 +216,14 @@ public final class Tracker {
     /// Серая или синяя, без учёта меток.
     private func needState(_ s: SessionInfo, now: Date) -> (dot: TrackedItem.Dot, since: Date)? {
         let cli = s.cliSessionId
-        if let cli, let since = waitingSince[cli] { return (.gray, since) }
+        if let cli, let since = waitingSince[cli] { return (.waiting, since) }
 
         // Итог хода «blocked» из файла, если пользователь ещё не ответил после этого хода.
         var fileBlocked = false
         if s.statusCategory == .blocked, let since = s.lastTurnEdgeAt ?? s.lastActivityAt {
             let answered = cli.flatMap { answeredAt[$0] }.map { $0 > since } ?? false
             fileBlocked = !answered
-            if fileBlocked && !isWorking(cli, now: now) { return (.gray, since) }
+            if fileBlocked && !isWorking(cli, now: now) { return (.waiting, since) }
         }
 
         guard !fileBlocked, !isWorking(cli, now: now) else { return nil }
@@ -230,14 +235,14 @@ public final class Tracker {
     /// С какого момента сессия ждёт ответа, если она сейчас серая.
     private func grayStart(_ cli: String, at date: Date) -> Date? {
         guard let local = localByCli[cli], let s = sessions[local],
-              let state = needState(s, now: date), state.dot == .gray else { return nil }
+              let state = needState(s, now: date), state.dot == .waiting else { return nil }
         return state.since
     }
 
     /// Серая из хуков — что она просит сейчас (итог прошлого хода из файла тут устарел).
     /// Серая из файла и синяя — итог хода, который приложение Claude записало в файл.
     private func detail(_ s: SessionInfo, dot: TrackedItem.Dot) -> String? {
-        if dot == .gray, let cli = s.cliSessionId, waitingSince[cli] != nil { return waitDetail[cli] }
+        if dot == .waiting, let cli = s.cliSessionId, waitingSince[cli] != nil { return waitDetail[cli] }
         return s.statusDetail
     }
 

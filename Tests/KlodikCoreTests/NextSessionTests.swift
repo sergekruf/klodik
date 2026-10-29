@@ -11,14 +11,19 @@ final class NextSessionTests: XCTestCase {
 
     lazy var items = [
         item("blue-old", .blue, waitingMinutes: 90),
-        item("gray-opened", .gray, waitingMinutes: 60, opened: true),
-        item("gray-new", .gray, waitingMinutes: 2),
-        item("gray-old", .gray, waitingMinutes: 30),
+        item("gray-opened", .waiting, waitingMinutes: 60, opened: true),
+        item("gray-new", .waiting, waitingMinutes: 2),
+        item("gray-old", .waiting, waitingMinutes: 30),
         item("remind", .remind, waitingMinutes: 5),
     ]
 
     func testOrderIsUnopenedGrayThenOpenedGrayThenRemindThenBlue() {
         XCTAssertEqual(NextSession.order(items).map(\.localId), ["gray-old", "gray-new", "gray-opened", "remind", "blue-old"])
+    }
+
+    func testClaudeUnreadGoesWithRemindBeforeBlue() {
+        let list = [item("blue", .blue, waitingMinutes: 90), item("unread", .unread, waitingMinutes: 50), item("remind", .remind, waitingMinutes: 5)]
+        XCTAssertEqual(NextSession.order(list).map(\.localId), ["unread", "remind", "blue"])
     }
 
     func testRepeatedPressesWalkTheQueueAndWrapAround() {

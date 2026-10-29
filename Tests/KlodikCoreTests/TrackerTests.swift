@@ -31,7 +31,7 @@ final class TrackerTests: XCTestCase {
         tracker.update(sessions: [session(1, focused: 30, edge: 20, status: .completed)])
         tracker.handle(event(1, .promptSubmit, 10), claudeFrontmost: false)
         tracker.handle(event(1, .permissionRequest("Bash"), 5), claudeFrontmost: false)
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
         XCTAssertEqual(items().first?.waitingSince, t(5))
     }
 
@@ -41,22 +41,22 @@ final class TrackerTests: XCTestCase {
         tracker.handle(event(2, .notification("elicitation_dialog"), 5), claudeFrontmost: false)
         tracker.handle(event(3, .notification("agent_needs_input"), 5), claudeFrontmost: false)
         tracker.handle(event(4, .notification("idle_prompt"), 5), claudeFrontmost: false)
-        XCTAssertEqual(dot(1), .gray)
-        XCTAssertEqual(dot(2), .gray)
-        XCTAssertEqual(dot(3), .gray)
+        XCTAssertEqual(dot(1), .waiting)
+        XCTAssertEqual(dot(2), .waiting)
+        XCTAssertEqual(dot(3), .waiting)
         XCTAssertNil(dot(4))
     }
 
     func testBlockedSummaryInFileMakesGray() {
         tracker.update(sessions: [session(1, focused: 60, edge: 30, status: .blocked)])
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
         XCTAssertEqual(items().first?.waitingSince, t(30))
     }
 
     func testGrayClearsAfterUserAnswers() {
         tracker.update(sessions: [session(1, focused: 30, edge: 20, status: .blocked)])
         tracker.handle(event(1, .promptSubmit, 2), claudeFrontmost: true)
-        XCTAssertNotEqual(dot(1), .gray)
+        XCTAssertNotEqual(dot(1), .waiting)
     }
 
     func testGrayClearsAfterPermissionGranted() {
@@ -64,9 +64,9 @@ final class TrackerTests: XCTestCase {
         tracker.handle(event(1, .preTool("Bash"), 6), claudeFrontmost: false)
         tracker.handle(event(1, .permissionRequest("Bash"), 6), claudeFrontmost: false)
         tracker.handle(event(1, .notification("permission_prompt"), 5.9), claudeFrontmost: false)
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
         tracker.handle(event(1, .postTool("Bash"), 4), claudeFrontmost: false)
-        XCTAssertNotEqual(dot(1), .gray)
+        XCTAssertNotEqual(dot(1), .waiting)
     }
 
     func testGrayClearsWhenNextTurnIsNotBlocked() {
@@ -80,7 +80,7 @@ final class TrackerTests: XCTestCase {
                                   session(2, focused: 30, edge: 20, status: .blocked)])
         XCTAssertEqual(items().first { $0.localId == "local_1" }?.openedSinceWaiting, true)
         XCTAssertEqual(items().first { $0.localId == "local_2" }?.openedSinceWaiting, false)
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
     }
 
     // MARK: синяя
@@ -131,7 +131,7 @@ final class TrackerTests: XCTestCase {
     func testReturningToClaudeDoesNotClearGray() {
         tracker.update(sessions: [session(1, focused: 30, edge: 3, status: .blocked)])
         tracker.markOnScreenRead(at: t(1))
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
     }
 
     func testFinishingWhileAnotherSessionIsOnScreenIsBlue() {
@@ -170,7 +170,7 @@ final class TrackerTests: XCTestCase {
         tracker.markRemind("local_1", at: t(5))
         tracker.markRemind("local_2", at: t(5))
         XCTAssertEqual(dot(1), .remind)
-        XCTAssertEqual(dot(2), .gray)
+        XCTAssertEqual(dot(2), .waiting)
     }
 
     func testMarksChangedCallback() {
@@ -187,7 +187,7 @@ final class TrackerTests: XCTestCase {
         tracker.hide("local_1", at: t(20))
         XCTAssertNil(dot(1))
         tracker.update(sessions: [session(1, focused: 60, edge: 5, status: .blocked)])
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
         XCTAssertTrue(tracker.hidden.isEmpty)
     }
 
@@ -195,7 +195,7 @@ final class TrackerTests: XCTestCase {
         tracker.update(sessions: [session(1, focused: 60, edge: 30, status: .blocked)])
         tracker.hide("local_1", at: t(20))
         tracker.handle(event(1, .permissionRequest("Bash"), 2), claudeFrontmost: false)
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
     }
 
     // MARK: какие сессии вообще смотрим
@@ -219,12 +219,12 @@ final class TrackerTests: XCTestCase {
 
     // MARK: «непрочитано» из Claude
 
-    func testClaudeUnreadMakesReadSessionBlue() {
+    func testClaudeUnreadShowsMarkedSession() {
         // Открыта после конца хода (прочитана), но в Claude отмечена непрочитанной.
         tracker.update(sessions: [session(1, focused: 5, edge: 30, status: .completed), session(2, focused: 5, edge: 30)])
         XCTAssertNil(dot(1))
         tracker.claudeUnread = ["local_1"]
-        XCTAssertEqual(dot(1), .blue)
+        XCTAssertEqual(dot(1), .unread)
         XCTAssertEqual(items().first?.waitingSince, t(30))
         XCTAssertNil(dot(2))
         // Claude снял отметку (сессию открыли) — пропала.
@@ -232,12 +232,15 @@ final class TrackerTests: XCTestCase {
         XCTAssertNil(dot(1))
     }
 
-    func testClaudeUnreadKeepsGrayAndRemind() {
-        tracker.update(sessions: [session(1, focused: 30, edge: 20, status: .blocked), session(2, focused: 5, edge: 30)])
+    func testClaudeUnreadKeepsWaitingAndRemindButBeatsBlue() {
+        tracker.update(sessions: [session(1, focused: 30, edge: 20, status: .blocked), session(2, focused: 5, edge: 30),
+                                  session(3, focused: 40, edge: 30)])
         tracker.markRemind("local_2", at: t(3))
-        tracker.claudeUnread = ["local_1", "local_2"]
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(3), .blue)
+        tracker.claudeUnread = ["local_1", "local_2", "local_3"]
+        XCTAssertEqual(dot(1), .waiting)
         XCTAssertEqual(dot(2), .remind)
+        XCTAssertEqual(dot(3), .unread)
     }
 
     func testClaudeUnreadIgnoresWindowAndHiddenButNotArchive() {
@@ -261,7 +264,7 @@ final class TrackerTests: XCTestCase {
     func testEventArrivingBeforeTheFileAppliesOnceFileShowsUp() {
         tracker.handle(event(1, .permissionRequest("Bash"), 1), claudeFrontmost: false)
         tracker.update(sessions: [session(1, focused: 2, edge: 2)])
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
     }
 
     // MARK: работает
@@ -335,7 +338,7 @@ final class TrackerTests: XCTestCase {
                             lastTurnEdgeAt: t(20), lastActivityAt: t(20), statusCategory: .completed, statusDetail: "старый итог")
         tracker.update(sessions: [s])
         tracker.handle(event(1, .notification("permission_prompt"), 2), claudeFrontmost: false)
-        XCTAssertEqual(dot(1), .gray)
+        XCTAssertEqual(dot(1), .waiting)
         XCTAssertNil(detail(1))
     }
 
