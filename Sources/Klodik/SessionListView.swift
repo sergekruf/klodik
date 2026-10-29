@@ -15,6 +15,8 @@ final class SessionListModel: ObservableObject {
     @Published var daySummary: DaySummary?
     /// На GitHub вышла версия новее установленной.
     @Published var update: UpdateCheck.Release?
+    /// Меняется при каждом открытии списка: прокрутить к самым свежим сессиям.
+    @Published var openedAt = Date()
 
     var open: (TrackedItem) -> Void = { _ in }
     var toggleRemind: (TrackedItem) -> Void = { _ in }
@@ -40,23 +42,28 @@ struct SessionListView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
             } else {
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(model.items, id: \.localId) { item in
-                            SessionRow(item: item, reminded: model.remindIds.contains(item.localId), now: model.now,
-                                       onHover: { model.hover(item, $0, $1) })
-                                .onTapGesture { model.open(item) }
-                                .contextMenu {
-                                    Button(model.remindIds.contains(item.localId) ? tr("Не напоминать", "Don't remind me") : tr("Напомнить", "Remind me")) {
-                                        model.toggleRemind(item)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 2) {
+                            ForEach(model.items, id: \.localId) { item in
+                                SessionRow(item: item, reminded: model.remindIds.contains(item.localId), now: model.now,
+                                           onHover: { model.hover(item, $0, $1) })
+                                    .onTapGesture { model.open(item) }
+                                    .contextMenu {
+                                        Button(model.remindIds.contains(item.localId) ? tr("Не напоминать", "Don't remind me") : tr("Напомнить", "Remind me")) {
+                                            model.toggleRemind(item)
+                                        }
+                                        Button(tr("Скрыть до следующей активности", "Hide until next activity")) { model.hide(item) }
                                     }
-                                    Button(tr("Скрыть до следующей активности", "Hide until next activity")) { model.hide(item) }
-                                }
+                            }
                         }
+                        .padding(6)
                     }
-                    .padding(6)
+                    .frame(maxHeight: 360)
+                    .onChange(of: model.openedAt) {
+                        if let first = model.items.first { proxy.scrollTo(first.localId, anchor: .top) }
+                    }
                 }
-                .frame(maxHeight: 360)
             }
 
             if model.formatBroken {

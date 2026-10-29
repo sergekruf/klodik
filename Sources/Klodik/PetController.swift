@@ -482,6 +482,7 @@ final class PetController: NSObject, NSMenuDelegate {
         }
         refresh()
         refreshHooksState()
+        listModel.openedAt = Date()   // каждый раз с самых свежих, где бы ни остановилась прокрутка в прошлый раз
         NSApp.activate(ignoringOtherApps: true)   // иначе список не получит Esc и клики мимо
         popover.show(relativeTo: content.sprite.bounds, of: content.sprite, preferredEdge: .maxY)
     }
