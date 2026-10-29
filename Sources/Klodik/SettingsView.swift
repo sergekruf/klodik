@@ -32,6 +32,15 @@ final class SettingsModel: ObservableObject {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
 
+    /// Легенда точек: те же цвета, что в Claude (решение пользователя).
+    static let legend: [(dot: TrackedItem.Dot, opened: Bool, text: String)] = [
+        (.waiting, false, tr("Ждёт ответа: разрешение или вопрос", "Needs your answer: a permission or a question")),
+        (.waiting, true, tr("Ждёт ответа, вы уже открывали", "Needs your answer, you already opened it")),
+        (.blue, false, tr("Закончила, вы ещё не открывали", "Finished, you haven't opened it yet")),
+        (.unread, false, tr("Отмечена непрочитанной в Claude", "Marked unread in Claude")),
+        (.remind, false, tr("«Напомнить» в Клодике (правый клик по строке)", "“Remind me” in Klodik (right-click a row)")),
+    ]
+
     var body: some View {
         Form {
             Section {
@@ -76,6 +85,15 @@ struct SettingsView: View {
                 }
                 Toggle(tr("Проверять новые версии на GitHub", "Check GitHub for new versions"),
                        isOn: Binding(get: { model.checkUpdates }, set: { model.setCheckUpdates($0) }))
+            }
+
+            Section(tr("Точки в списке", "Dots in the list")) {
+                ForEach(Self.legend, id: \.text) { row in
+                    HStack(spacing: 10) {
+                        DotView(dot: row.dot, opened: row.opened)
+                        Text(row.text)
+                    }
+                }
             }
 
             // Порт приёмника и глубина истории (7 дней) живут только в state.json: обычному пользователю они не нужны.

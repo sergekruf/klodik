@@ -135,7 +135,7 @@ private struct SessionRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Dot(dot: item.dot, opened: item.openedSinceWaiting)
+            DotView(dot: item.dot, opened: item.openedSinceWaiting)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title).lineLimit(1)
                 Text(item.projectName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -163,7 +163,7 @@ private struct SessionRow: View {
 
 /// Как в Claude: оранжевая — нужен ответ (кольцо, если уже открывали), синяя — закончила и не прочитана,
 /// серая — отмечена непрочитанной в Claude, серая с колокольчиком — «Напомнить» в Клодике.
-private struct Dot: View {
+struct DotView: View {
     let dot: TrackedItem.Dot
     let opened: Bool
 
