@@ -22,8 +22,10 @@ https://github.com/user-attachments/assets/baba8fa6-3eba-478a-84c3-d66fe0d9cad1
 
 <img src="docs/media/list.png" width="392" align="right" alt="Список сессий Клодика">
 
-- **Список по клику.** Клик по Клодику открывает список сессий, которым вы нужны: свежие сверху. Клик по строке открывает именно эту сессию в Claude.
-- **Что просит сессия.** Под названием видно, что именно ей нужно: «Bash: npm run migrate», имя файла, текст вопроса или итог хода от Claude. Можно решить, что срочно, не переключаясь.
+- **Список по клику.** Клик по Клодику открывает список сессий, которым вы нужны: свежие сверху, каждый раз с самого начала. Клик по строке открывает именно эту сессию в Claude.
+- **Поиск и проекты.** Когда сессий восемь и больше, сверху поиск и кнопки проектов. Поиск сразу в фокусе: печатайте «ламода», и останутся сессии Lamoda, русские слова ищутся и латиницей.
+- **Что просит сессия.** Наведите курсор на строку: слева появится окошко с тем, что ей нужно, — «Bash: npm run migrate», имя файла или итог хода от Claude. Если Claude задал вопрос с вариантами, в окошке будут вопрос и все варианты с пояснениями, как в самом Claude. Отвечать — в Claude, клик по строке откроет сессию.
+- **Итоги по-русски.** Claude иногда пишет итог хода по-английски. Клодик переводит его прямо на Mac встроенным переводчиком macOS, без интернета. Нужна macOS 26 и один раз скачанные языки — кнопка в настройках.
 - **⌥⌘K — к следующей сессии.** Открывает сессию, которая дольше всех ждёт ответа. Нажмите ещё раз — следующую. Очередь можно разобрать, не трогая мышь.
 - **Точки как в Claude.**
   - оранжевая — Claude ждёт ответа: просит разрешение или задал вопрос;
@@ -31,14 +33,18 @@ https://github.com/user-attachments/assets/baba8fa6-3eba-478a-84c3-d66fe0d9cad1
   - синяя — закончила работу, вы её ещё не открывали;
   - серая — вы сами отметили её непрочитанной в Claude;
   - серая с колокольчиком — ваша метка «Напомнить» в Клодике.
+- **Срок цветом.** Время у сессий, которые ждут ответа, оранжевое после суток и красное после трёх дней: застрявшие решения видно сразу.
 - **Бейдж над головой.** Сколько сессий в списке. Красный, если хоть одна ждёт ответа.
 - **Напоминает и успокаивается.** Прыгает из-за свежих сессий, которые ждут ответа. Из-за остальных изредка машет. Пока Claude открыт на переднем плане, молчит.
-- **Пузыри.** «Ждёт ответа: …» и «Готово: …», когда сессия только что изменилась.
+- **Пузыри как в комиксах.** Когда сессия закончила работу или ждёт ответа, над Клодиком появляется облачко: название сессии и что она сделала или просит. Висит 10–20 секунд, под курсором не гаснет, клик открывает сессию.
+- **Утренняя сводка.** Раз в день, когда вы утром садитесь за Mac: «Ждут ваших решений: 5, дольше всех „Интеграция с 1С“: 2 дня». Клик открывает самую давнюю.
 - **Правый клик по строке.** «Напомнить» — Клодик будет напоминать о сессии, пока вы её не откроете. «Скрыть до следующей активности» — убрать из списка.
 - **Сводка за день.** Внизу списка: на сколько запросов вы сегодня ответили, как быстро в среднем и какая сессия ждала дольше всех.
-- **Отложить на 30 минут**, если нужно сосредоточиться.
+- **Отложить** на 30 минут, если нужно сосредоточиться, или до 9 утра, чтобы вечером и ночью Клодик молчал.
 
 <br clear="right">
+
+<p align="center"><img src="docs/media/bubble.png" width="333" alt="Пузырь «Готово» над Клодиком"></p>
 
 ## Анимации
 
@@ -79,6 +85,7 @@ https://github.com/user-attachments/assets/baba8fa6-3eba-478a-84c3-d66fe0d9cad1
   - «Настойчиво» — раз в 30 секунд, через 2 минуты без остановки.
 - **⌥⌘K — к следующей сессии.** Можно выключить, если сочетание нужно другому приложению.
 - **Проверять новые версии на GitHub.** Раз в сутки; когда выходит новая версия, в списке появляется кнопка «Скачать».
+- **Переводить итоги на русский.** Строка появляется, только если языки перевода macOS ещё не скачаны: кнопка «Скачать» просит macOS их загрузить. macOS может отложить загрузку на потом, быстрее скачать в «Язык и регион» → «Языки перевода».
 - **Точки в списке.** Подсказка, что значит каждый цвет.
 - **Claude Code.** Подключить или отключить хуки.
 
@@ -86,7 +93,7 @@ https://github.com/user-attachments/assets/baba8fa6-3eba-478a-84c3-d66fe0d9cad1
 
 ## Как это работает
 
-Клодик не отправляет ваши данные в интернет и ничего не пишет в сессии. Единственный запрос наружу: раз в сутки он спрашивает у GitHub номер последней версии, это выключается в настройках. О сессиях он узнаёт из трёх источников:
+Клодик не отправляет ваши данные в интернет и ничего не пишет в сессии. Единственный запрос наружу: раз в сутки он спрашивает у GitHub номер последней версии, это выключается в настройках. Перевод итогов идёт встроенным переводчиком macOS на самом Mac. О сессиях он узнаёт из трёх источников:
 
 - **Файлы сессий приложения Claude** в `~/Library/Application Support/Claude/claude-code-sessions`. Клодик только читает их и следит за изменениями через FSEvents, без опроса.
 - **Метки «непрочитано» из Claude** во внутреннем хранилище приложения (`Local Storage/leveldb`). Клодик только читает их. Формат нигде не описан: если он поменяется, Клодик просто перестанет видеть эти метки.
@@ -136,7 +143,12 @@ bash scripts/build-app.sh --install
 Klodik is my unofficial desktop pet for the Code tab of the Claude app on macOS. I run about ten sessions in parallel and kept missing the one that asked for permission half an hour ago. Klodik knows about every session that needs me and keeps reminding me until I deal with them.
 
 - **Click the pet** to see sessions that wait for you: orange means Claude needs an answer, blue means a finished turn you haven't opened, gray means you marked the session unread in Claude. Click a row to open exactly that session.
-- **See what each session asks for**: `Bash: npm run migrate`, a file name, the question text, or Claude's own turn summary.
+- **Search and projects**: with eight or more sessions, a search field and project buttons appear on top.
+- **Hover a row** to see what the session asks for: `Bash: npm run migrate`, a file name, Claude's turn summary, or Claude's question with all answer options. Answer in Claude; clicking the row opens the session.
+- **Comic-style bubbles** show what a session just finished or asks for; hover keeps them, click opens the session.
+- **Morning digest**: once a day, how many decisions wait for you and which one has waited longest. Waits over a day turn orange, over three days red.
+- **Snooze** for 30 minutes or until 9 a.m.
+- **Turn summaries in your language**: Claude sometimes writes them in the other language; Klodik translates on-device with macOS Translation (macOS 26+).
 - **⌥⌘K** opens the session that has waited longest; press again for the next one.
 - **Reminders** grow from a jump per minute to one every 30 seconds (Gentle, Normal and Insistent levels). It stays quiet while Claude is in front.
 - **Daily summary**: how many requests you answered today, how fast on average, and the longest wait.
